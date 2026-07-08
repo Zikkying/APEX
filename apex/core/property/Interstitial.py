@@ -24,7 +24,6 @@ from dflow.python import upload_packages
 
 upload_packages.append(__file__)
 
-PREDEFINED_LIST = ['bcc', 'fcc', 'hcp']
 TOL = 1e-5
 
 class Interstitial(Property):
@@ -41,6 +40,9 @@ class Interstitial(Property):
                 self.lattice_type = parameter["lattice_type"]
                 parameter["voronoi_param"] = parameter.get("voronoi_param", {})
                 self.voronoi_param = parameter["voronoi_param"]
+                parameter["special_list"] = parameter.get("special_list", ['bcc', 'fcc', 'hcp'])
+                self.special_list = parameter["special_list"]
+
             parameter["cal_type"] = parameter.get("cal_type", "relaxation")
             default_cal_setting = {
                 "relax_pos": True,
@@ -191,7 +193,7 @@ class Interstitial(Property):
                 if not self.insert_ele:
                     self.insert_ele = [str(ii) for ii in set(ss.composition.elements)]
                 for ii in self.insert_ele:
-                    if self.structure_type in PREDEFINED_LIST:
+                    if self.structure_type in self.special_list:
                         # rotate and translate hcp structure to specific orientation for interstitial generation
                         if self.structure_type == 'hcp':
                             theta = -2 * np.pi / 3
@@ -278,7 +280,7 @@ class Interstitial(Property):
                 os.chdir(self.path_to_work)
 
                 # create pre-defined special SIA structure for bcc fcc and hcp
-                if self.structure_type in PREDEFINED_LIST:
+                if self.structure_type in self.special_list:
                     self.task_list = []
                     if not os.path.isfile("task.000000/POSCAR"):
                         raise RuntimeError("need task.000000 structure as reference")
@@ -292,6 +294,7 @@ class Interstitial(Property):
                     with open("task.000000/POSCAR", "r") as fin:
                         self.pos_line = fin.read().split("\n")
 
+                    chl = None
                     for idx, ii in enumerate(self.pos_line):
                         ss = ii.split()
                         if len(ss) > 3:
@@ -301,11 +304,19 @@ class Interstitial(Property):
                                     and abs(0.14 / self.supercell[2] - float(ss[2])) < TOL
                             ):
                                 chl = idx
+                    if chl is None:
+                        raise RuntimeError(
+                            f"Could not locate the generated interstitial anchor site "
+                            f"for {self.structure_type} special interstitial generation. "
+                            "Check the relaxed structure, supercell, or set special_list=[] "
+                            "to use the Voronoi generator."
+                        )
                     shutil.rmtree("task.000000")
 
                     os.chdir(cwd)
                     # specify interstitial structures
                     if self.structure_type == 'bcc':
+                        center = None
                         for idx, ii in enumerate(self.pos_line):
                             ss = ii.split()
                             if len(ss) > 3:
@@ -315,6 +326,13 @@ class Interstitial(Property):
                                         and abs(0.5 / self.supercell[2] - float(ss[2])) < TOL
                                 ):
                                     center = idx
+                        if center is None:
+                            raise RuntimeError(
+                                "Could not locate the BCC center atom required for "
+                                "special interstitial dumbbell generation. Check the "
+                                "relaxed structure/supercell or set special_list=[] "
+                                "to use the Voronoi generator."
+                            )
                         bcc_interstital_dict = {
                             'tetrahedral': {chl: [0.25, 0.5, 0]},
                             'octahedral': {chl: [0.5, 0.5, 0]},
@@ -329,6 +347,8 @@ class Interstitial(Property):
                         total_task = self.__gen_tasks(bcc_interstital_dict)
 
                     elif self.structure_type == 'fcc':
+                        face = None
+                        corner = None
                         for idx, ii in enumerate(self.pos_line):
                             ss = ii.split()
                             if len(ss) > 3:
@@ -345,6 +365,13 @@ class Interstitial(Property):
                                         and abs(1 / self.supercell[2] - float(ss[2])) < TOL
                                 ):
                                     corner = idx
+                        if face is None or corner is None:
+                            raise RuntimeError(
+                                "Could not locate the FCC face/corner atoms required "
+                                "for special interstitial generation. Check the relaxed "
+                                "structure/supercell or set special_list=[] to use the "
+                                "Voronoi generator."
+                            )
 
                         fcc_interstital_dict = {
                             'tetrahedral': {chl: [0.75, 0.25, 0.25]},
@@ -374,6 +401,7 @@ class Interstitial(Property):
                         total_task = self.__gen_tasks(fcc_interstital_dict)
 
                     elif self.structure_type == 'hcp':
+                        center = None
                         for idx, ii in enumerate(self.pos_line):
                             ss = ii.split()
                             if len(ss) > 3:
@@ -383,6 +411,13 @@ class Interstitial(Property):
                                         and abs(0.25 / self.supercell[2] - float(ss[2])) < TOL
                                 ):
                                     center = idx
+                        if center is None:
+                            raise RuntimeError(
+                                "Could not locate the HCP center atom required for "
+                                "special interstitial generation. Check the relaxed "
+                                "structure/supercell or set special_list=[] to use the "
+                                "Voronoi generator."
+                            )
                         hcp_interstital_dict = {
                             'O': {chl: [0, 0, 0.5]},
                             'BO': {chl: [0, 0, 0.25]},

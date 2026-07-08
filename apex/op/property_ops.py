@@ -10,11 +10,129 @@ from dflow.python import (
     upload_packages
 )
 from monty.serialization import dumpfn
-from apex.utils import recursive_search
+from apex.utils import recursive_search, apex_task_succeeded
 from apex.core.lib.utils import create_path
 from apex.core.calculator import LAMMPS_INTER_TYPE
+from apex.task_failure import (
+    REMOTE_LAMMPS_STARTUP_FAILURE,
+    classify_apex_task_status,
+)
 
 upload_packages.append(__file__)
+
+
+def _load_task_status(status_path: Path):
+    if not status_path.is_file():
+        return None
+    try:
+        return loadfn(status_path)
+    except Exception as exc:
+        return {
+            "state": "failed",
+            "reason": "invalid_task_status",
+            "message": f"Could not parse apex_task_status.json: {exc}",
+            "exit_code": None,
+        }
+
+
+def _is_failed_task_status(status) -> bool:
+    if status is None:
+        return False
+    classified = classify_apex_task_status(status)
+    return classified.get("state") != "succeeded" or classified.get("exit_code") != 0
+
+
+def _collect_lammps_status_failures(path_to_prop: Path):
+    failures = []
+    for status_path in sorted(path_to_prop.glob("task.*/apex_task_status.json")):
+        status = _load_task_status(status_path)
+        classified = classify_apex_task_status(status, status_path.parent)
+        if classified.get("state") != "succeeded" or classified.get("exit_code") != 0:
+            failures.append(
+                {
+                    "task": str(status_path.parent),
+                    "state": classified.get("state"),
+                    "reason": classified.get("reason"),
+                    "exit_code": classified.get("exit_code"),
+                    "message": classified.get("message"),
+                    "retry_reason": classified.get("retry_reason"),
+                    "original_reason": classified.get("original_reason"),
+                }
+            )
+    return failures
+
+
+class PropsRepairStatusCheck(OP):
+    """
+    Lightweight status gate between LAMMPS run and property post.
+
+    The actual bounded retry happens inside RunLAMMPS for the only transient
+    class we currently trust. This OP records which failures remain eligible
+    for that repair path and leaves deterministic errors for PropsPost to fail.
+    """
+
+    @classmethod
+    def get_input_sign(cls):
+        return OPIOSign({
+            'input_post': Artifact(Path, sub_path=False),
+            'input_all': Artifact(Path),
+            'task_names': List[str],
+            'path_to_prop': str
+        })
+
+    @classmethod
+    def get_output_sign(cls):
+        return OPIOSign({
+            'checked_post': Artifact(Path, sub_path=False)
+        })
+
+    @OP.exec_sign_check
+    def execute(self, op_in: OPIO) -> OPIO:
+        cwd = os.getcwd()
+        input_post = op_in["input_post"]
+        input_all = op_in["input_all"]
+        task_names = op_in["task_names"]
+        path_to_prop = op_in["path_to_prop"]
+
+        if len(task_names) == 0:
+            return OPIO({"checked_post": input_post})
+
+        try:
+            copy_dir_list_input = [path_to_prop.split('/')[0]]
+            os.chdir(input_all)
+            copy_dir_list = []
+            for ii in copy_dir_list_input:
+                copy_dir_list.extend(glob.glob(ii))
+            copy_dir_list = sorted(set(copy_dir_list))
+
+            os.chdir(input_post)
+            src_path = recursive_search(copy_dir_list)
+            if not src_path:
+                return OPIO({"checked_post": input_post})
+
+            prop_root = Path(src_path) / path_to_prop
+            failures = _collect_lammps_status_failures(prop_root)
+            if failures:
+                eligible = [
+                    item for item in failures
+                    if item.get("reason") == REMOTE_LAMMPS_STARTUP_FAILURE
+                ]
+                dumpfn(
+                    {
+                        "failed_tasks": failures,
+                        "retry_eligible_tasks": eligible,
+                        "retry_policy": (
+                            "RunLAMMPS retries remote_lammps_startup_failure before "
+                            "this status check; remaining failures are passed to PropsPost."
+                        ),
+                    },
+                    prop_root / "run_status_check.json",
+                    indent=4,
+                )
+        finally:
+            os.chdir(cwd)
+
+        return OPIO({"checked_post": input_post})
 
 
 class PropsMake(OP):
@@ -61,7 +179,8 @@ class PropsMake(OP):
         cwd = Path.cwd()
         os.chdir(input_work_path)
         abs_path_to_prop = input_work_path / path_to_prop
-        if os.path.exists(abs_path_to_prop):
+        rerun_finished = prop_param.get("rerun_finished", True)
+        if os.path.exists(abs_path_to_prop) and rerun_finished:
             shutil.rmtree(abs_path_to_prop)
         create_path(str(abs_path_to_prop))
         conf_path = abs_path_to_prop.parent
@@ -91,6 +210,9 @@ class PropsMake(OP):
         prop = make_property_instance(prop_param, inter_param_prop)
         task_list = prop.make_confs(abs_path_to_prop, path_to_equi, do_refine)
         for kk in task_list:
+            if (not rerun_finished) and apex_task_succeeded(kk):
+                print(f"Skip preparing completed property task {kk} (apex_task_status.json state=succeeded, rerun_finished=False)")
+                continue
             poscar = os.path.join(kk, "POSCAR")
             inter = make_calculator(inter_param_prop, poscar)
             inter.make_potential_files(kk)
@@ -105,17 +227,21 @@ class PropsMake(OP):
         task_list_name = {'task_list': glob.glob('task.*').sort()}
         dumpfn(task_list_name, 'task_list.json')
         os.chdir(input_work_path)
-        task_list_str = glob.glob(path_to_prop + '/' + 'task.*')
-        task_list_str.sort()
 
-        all_jobs = task_list
+        if rerun_finished:
+            all_jobs = task_list
+        else:
+            all_jobs = [task for task in task_list if not apex_task_succeeded(task)]
+            for task in sorted(set(task_list) - set(all_jobs)):
+                print(f"Skip running completed property task {task} (apex_task_status.json state=succeeded, rerun_finished=False)")
         njobs = len(all_jobs)
-        jobs = [pathlib.Path(job) for job in task_list]
+        jobs = [pathlib.Path(job) for job in all_jobs]
+        run_task_names = [os.path.join(path_to_prop, os.path.basename(job)) for job in all_jobs]
 
         os.chdir(cwd)
         op_out = OPIO({
             "output_work_path": input_work_path,
-            "task_names": task_list_str,
+            "task_names": run_task_names,
             "njobs": njobs,
             "task_paths": jobs
         })
@@ -196,11 +322,26 @@ class PropsPost(OP):
             inter_param = prop_param["cal_setting"]["overwrite_interaction"]
 
         abs_path_to_prop = Path.cwd() / path_to_prop
+        lammps_failures = _collect_lammps_status_failures(abs_path_to_prop)
+        if lammps_failures:
+            dumpfn(
+                {"failed_tasks": lammps_failures},
+                abs_path_to_prop / "failed_lammps_tasks.json",
+                indent=4,
+            )
+            raise RuntimeError(
+                "LAMMPS failed for property task(s): "
+                + ", ".join(item["task"] for item in lammps_failures)
+                + ". Retrieved task directories contain apex_task_status.json "
+                "with failed status records, .debug.log, log.lammps, outlog, "
+                "and any partial output files."
+            )
+
         prop = make_property_instance(prop_param, inter_param)
         param_json = os.path.join(abs_path_to_prop, "param.json")
         param_dict = prop.parameter
-        param_dict.setdefault("skip", False) # default of "skip" is False
-        param_dict.pop("skip")
+        param_dict.pop("skip", None)
+        param_dict.pop("req_calc", None)
         dumpfn(param_dict, param_json)
         prop.compute(
             os.path.join(abs_path_to_prop, "result.json"),
