@@ -1,20 +1,9 @@
-FROM python:3.10-slim
+# Reuse the Bohrium-hosted APEX base; no Docker Hub pull is needed.
+FROM registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    git \
-    build-essential \
-    openssh-server \
-    supervisor \
-    net-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN python -m pip install --upgrade pip setuptools wheel
 
 RUN python -m pip install apex-flow==1.3.2
 
