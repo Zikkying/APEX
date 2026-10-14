@@ -5,7 +5,7 @@
 # APEX: Alloy Property EXplorer
 [![](https://img.shields.io/pypi/v/apex-flow.svg)](https://pypi.org/project/apex-flow/)
 
-[1.3.1 Changelog](./CHANGELOG-1.3.1.md) · [1.3.0 Changelog](./CHANGELOG-1.3.0.md)
+[1.3.2 Changelog](./CHANGELOG-1.3.2.md) · [1.3.1 Changelog](./CHANGELOG-1.3.1.md) · [1.3.0 Changelog](./CHANGELOG-1.3.0.md)
 
 [APEX](https://github.com/deepmodeling/APEX) helps materials scientists build reliable alloy property workflows that run on local machines, on-premises clusters, or the Bohrium cloud. It refactors the [DP-GEN](https://github.com/deepmodeling/dpgen) `auto_test` module into a flexible, dflow-powered Python package that prepares tasks, dispatches calculations, monitors progress, and collects results for calculators such as **LAMMPS**, **VASP**, and **ABACUS**.
 
@@ -241,7 +241,7 @@ Create `global_bohrium.json` to submit workflows to the Bohrium cloud platform:
 {
   "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
   "lammps_run_command":"lmp -in in.lammps",
-  "scass_type":"c16_m120_1 * NVIDIA L20"
+  "scass_type":"1 * NVIDIA L20_48g"
 }
 ```
 

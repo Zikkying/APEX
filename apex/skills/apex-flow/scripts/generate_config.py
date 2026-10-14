@@ -55,12 +55,12 @@ SANDBOX_DFLOW_HOST = "https://lbg-workflow-dflow.dp.tech"
 SANDBOX_DISPATCHER_IMAGE = (
     "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811"
 )
-APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post"
+APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2"
 LAMMPS_GPU_IMAGE = (
     "registry.dp.tech/dptech/dp/native/prod-16664/"
     "dpa4-phonolammps:0.0.2"
 )
-LAMMPS_CPU_IMAGE = APEX_IMAGE
+LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post"
 # Backward-compatible alias used by external callers and older tests. New code
 # must select LAMMPS_GPU_IMAGE or LAMMPS_CPU_IMAGE from the potential type.
 LAMMPS_IMAGE = LAMMPS_GPU_IMAGE
@@ -241,7 +241,7 @@ def select_lammps_image(potential: str = None) -> str:
 
 # scass_type defaults for inner dflow containers (legacy Bohrium)
 SCASS_TYPES = {
-    "lammps_gpu": "c16_m120_1 * NVIDIA L20",
+    "lammps_gpu": "1 * NVIDIA L20_48g",
     "lammps_cpu": "c16_m32_cpu",
     "abacus": "c16_m32_cpu",
     "vasp": "c32_m128_cpu",
@@ -714,7 +714,7 @@ def build_global_json(backend: str, potential: str = None,
 
     # Add backend-specific image fields
     if backend == "abacus":
-        config["abacus_image_name"] = APEX_IMAGE
+        config["abacus_image_name"] = LAMMPS_CPU_IMAGE
         config["abacus_run_command"] = calc_run_command
     elif backend == "vasp":
         # Never invent a VASP image — commercial license required.
@@ -819,7 +819,7 @@ def build_global_json_sandbox(backend: str, potential: str = None,
 
     # Add backend-specific image fields
     if backend == "abacus":
-        config["abacus_image_name"] = APEX_IMAGE
+        config["abacus_image_name"] = LAMMPS_CPU_IMAGE
         config["abacus_run_command"] = calc_run_command
     elif backend == "vasp":
         config["vasp_run_command"] = calc_run_command
@@ -2298,22 +2298,15 @@ mixing_beta         0.7
             f"'{staged_prefix}' (do not keep absolute /share/... paths)."
         )
 
-    # Write outer-job run.sh (force-upgrade APEX; bare pip install keeps the
-    # image-bundled older version and uploads that stale code to inner steps).
+    # Verify the image runtime before submitting with the same interpreter.
+    shutil.copyfile(Path(__file__).with_name("ensure_apex.py"),
+                    output_dir / "ensure_apex.py")
     run_script = output_dir / "run.sh"
-    cmd = f'apex submit param.json -c global.json -f {args.flow_type} -n "{workflow_name}"'
+    cmd = f'python3 -m apex submit param.json -c global.json -f {args.flow_type} -n "{workflow_name}"'
     with open(run_script, "w") as f:
         f.write("#!/bin/bash\n")
         f.write("set -eo pipefail\n\n")
-        f.write("# Upgrade to latest apex-flow.\n")
-        f.write(
-            "python3 -m pip install --upgrade --no-cache-dir apex-flow "
-            "2>&1 | tail -5\n"
-        )
-        f.write(
-            'python3 -c "import apex; '
-            'print(f\'APEX version: {apex.__version__}\')"\n\n'
-        )
+        f.write("python3 ensure_apex.py\n\n")
         f.write(
             "# Authentication is already stored in global.json by "
             "generate_config.py.\n"
@@ -2336,7 +2329,7 @@ mixing_beta         0.7
     os.chmod(run_script, 0o755)
     print(f"Written: {run_script}")
 
-    # Keep a minimal submit.sh for local/debug use inside an already-upgraded env.
+    # Keep a minimal submit.sh for an already-verified local environment.
     submit_script = output_dir / "submit.sh"
     with open(submit_script, "w") as f:
         f.write("#!/bin/bash\n")
@@ -2344,7 +2337,7 @@ mixing_beta         0.7
         f.write(f"# Workflow name: {workflow_name}\n")
         f.write(f"# Flow type: {args.flow_type}\n")
         f.write(
-            "# Prefer run.sh for Bohrium outer jobs (it upgrades apex-flow).\n\n"
+            "# Prefer run.sh for Bohrium outer jobs (it verifies/reuses the image runtime).\n\n"
         )
         f.write(f"{cmd}\n")
     os.chmod(submit_script, 0o755)

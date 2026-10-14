@@ -70,7 +70,7 @@ class Config:
     # basic run config
     run_image_name: str = None
     run_command: str = None
-    apex_image_name: str = "zhuoyli/apex_amd64"
+    apex_image_name: str = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2"
     group_size: int = None
     pool_size: int = None
     upload_python_packages: list = field(default_factory=list)
@@ -216,6 +216,26 @@ class Config:
             raise RuntimeError(
                 f'please provide a nested machine dictionary '
                 f'for context type: {self.context_type}'
+            )
+
+        # The legacy job and Sandbox APIs have different machine catalogs.
+        # Check the effective dictionary after nested user overrides, so an old
+        # generated configuration fails before creating remote workflow tasks.
+        machine = self.machine_dict or {}
+        context = str(machine.get("context_type", "")).lower()
+        profile = machine.get("remote_profile") or {}
+        if context in {"bohrium", "bohriumcontext", "boriumcontext"}:
+            scass = (profile.get("input_data") or {}).get("scass_type")
+            if scass == "c16_m120_1 * NVIDIA L20":
+                raise ValueError(
+                    "Bohrium jobs require scass_type='1 * NVIDIA L20_48g'; "
+                    "c16_m120_1 * NVIDIA L20 belongs to OpenAPI Sandbox. "
+                    "Check machine.remote_profile.input_data overrides too."
+                )
+        elif context == "openapi" and profile.get("machine_type") == "1 * NVIDIA L20_48g":
+            raise ValueError(
+                "OpenAPI Sandbox requires machine_type='c16_m120_1 * NVIDIA L20'; "
+                "1 * NVIDIA L20_48g belongs to the ordinary Bohrium job catalog."
             )
 
         # default pool_size as two size must be indicated simultaneously

@@ -17,7 +17,7 @@ APEX uses a **two-layer submission architecture**:
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Outer Bohrium Job (APEX image, c1_m2_cpu)                     │
-│  1. pip install --upgrade --no-cache-dir apex-flow             │
+│  1. verify/reuse image APEX (>= 1.3.2)             │
 │  2. apex submit param.json -c global.json -n "<wf-name>"      │
 │  → Connects to workflows.deepmodeling.com                      │
 │  → Waits for completion and retrieves results automatically    │
@@ -32,7 +32,7 @@ APEX uses a **two-layer submission architecture**:
 │  - ABACUS image: registry.dp.tech/dptech/abacus:3.2.3          │
 │  - VASP image: (user-provided)                                  │
 │  - Machine type per task: scass_type in global.json             │
-│  - APEX code: received via upload_packages (always latest)      │
+│  - APEX code: received via upload_packages (client version)      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -74,13 +74,12 @@ the job directory is packaged:
 #!/bin/bash
 set -eo pipefail
 
-python3 -m pip install --upgrade --no-cache-dir apex-flow 2>&1 | tail -5
-python3 -c "import apex; print(f'APEX version: {apex.__version__}')"
+python3 ensure_apex.py  # Generated helper; copy it with run.sh
 
 # Authentication is already stored in global.json by generate_config.py.
 # Do not read BOHRIUM_ACCESS_KEY or refresh the ticket in this container.
 set +eo pipefail
-apex submit param.json -c global.json -n "<workflow-name>" 2>&1 | tee apex_submit.log
+python3 -m apex submit param.json -c global.json -n "<workflow-name>" 2>&1 | tee apex_submit.log
 EXIT_CODE=${PIPESTATUS[0]}
 set -eo pipefail
 
@@ -96,7 +95,9 @@ fi
 ```
 
 **Key points:**
-- Must use `pip install --upgrade --no-cache-dir apex-flow` (no `==` pin).
+- Reuse an installed stable APEX >= 1.3.2 after checking imports and CLI startup. No pip request is made for a working image runtime.
+- The generated `ensure_apex.py` installs `apex-flow==1.3.2` only when missing or older. It fails on broken imports/CLI, and submission uses the same Python interpreter.
+- Include `ensure_apex.py` in the packaged outer job. Use the APEX client image, not the dispatcher or GPU calculator image.
 - The installed APEX code is automatically sent to inner dflow steps via `upload_packages`
 - `run.sh` does not access `BOHRIUM_ACCESS_KEY` or modify `global.json`
 - **单次执行，不重试** — 失败即退出，由用户决定是否重新提交
@@ -118,10 +119,10 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 
 | Role | Image | Notes |
 |------|-------|-------|
-| **Outer job (submission client)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | Lightweight; just runs `apex submit` |
+| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2` | Lightweight; just runs `apex submit` |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | NVIDIA L20 default; RTX 4090 compatible; includes phonoLAMMPS |
 | **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | EAM/MEAM/SNAP/GAP/RANN CPU backend |
-| **ABACUS calculator** | (same APEX image has ABACUS) | Or user-specified |
+| **ABACUS calculator** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | Or user-specified |
 | **VASP calculator** | User must provide after confirming license | Commercial; **never invent a default image** |
 
 > Legacy `deepmd-kit:3.1.1` remains blocked with NVIDIA T4 and for triclinic
@@ -155,7 +156,7 @@ unchanged.
 
 | Backend | scass_type (inner containers) | Notes |
 |---------|-------------------------------|-------|
-| LAMMPS (DeePMD/MACE/NEP) | `c16_m120_1 * NVIDIA L20` | Validated sm89 default; RTX 4090 remains compatible |
+| LAMMPS (DeePMD/MACE/NEP) | `1 * NVIDIA L20_48g` | Validated sm89 default; RTX 4090 remains compatible |
 | LAMMPS (EAM/MEAM/SNAP) | `c16_m32_cpu` | CPU sufficient |
 | ABACUS | `c16_m32_cpu` | CPU |
 | VASP | `c32_m128_cpu` (default) | Align `mpirun -n <N>` with CPU count |
@@ -214,7 +215,7 @@ The following is a type-annotated shape, not valid JSON:
         "ticket": "<UUID from API conversion — auto-filled by generate_config.py>",
         "project_id": <the same unquoted integer>
     },
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2",
     "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
     "lammps_run_command": "lmp -in in.lammps",
     "scass_type": "c16_m32_cpu",
@@ -236,7 +237,7 @@ Do not upload or submit unless validation reports `Validation PASSED` and both
 project ID lines report `type=int`. Submit the newly validated directory as a
 new outer Bohrium job; retrying an old outer job reuses its old input snapshot.
 
-> For GPU potentials (DeePMD, MACE, NEP), change `scass_type` to `"c16_m120_1 * NVIDIA L20"` by default; RTX 4090 remains compatible.
+> For GPU potentials (DeePMD, MACE, NEP), change `scass_type` to `"1 * NVIDIA L20_48g"` by default; RTX 4090 remains compatible.
 > Before submitting, run `scripts/validate_apex_combo.py check` on the chosen image × scass_type.
 
 ## Agent-Managed Submission Workflow (Complete Lifecycle)
@@ -285,3 +286,7 @@ workflow and retrieves its results automatically:
 
 - `WARNING:root:Missing Bohrium account fields: email, password.` — Normal with ticket auth
 - `WARNING:root:Skip copying relaxation for confs/std-fcc: .../relaxation not found.` — Normal for first-time joint workflow (relaxation hasn't produced output yet when props phase starts scanning)
+
+## Machine catalogs
+
+Legacy Bohrium jobs (`context_type=Bohrium`) use `scass_type="1 * NVIDIA L20_48g"`. OpenAPI Sandbox uses `machine_type="c16_m120_1 * NVIDIA L20"`. Check `bohr machine list -c gpu -s job` and `bohr sandbox machine list --choose-type gpu`, respectively; do not copy identifiers between the two catalogs.

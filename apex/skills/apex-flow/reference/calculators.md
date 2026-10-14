@@ -635,9 +635,9 @@ Before submit:
 
 | Workload | Bohrium Machine | Rationale |
 |----------|----------------|-----------|
-| LAMMPS + GPU potential (DeePMD/MACE/NEP) | `c16_m120_1 * NVIDIA L20` | Validated sm89 runtime; greater resource availability |
+| LAMMPS + GPU potential (DeePMD/MACE/NEP) | `1 * NVIDIA L20_48g` | Validated sm89 runtime; greater resource availability |
 | LAMMPS + CPU potential (EAM/MEAM/SNAP) | `c16_m32_cpu` | CPU sufficient |
 | ABACUS DFT (small cell <50 atoms) | `c16_m32_cpu` | 8 MPI ranks |
 | ABACUS DFT (large cell 50-200 atoms) | `c32_m128_cpu` | 16-32 MPI ranks |
 | VASP DFT | User choice | Depends on system size |
-| Finite-T MD (long runs) | `c16_m120_1 * NVIDIA L20` | Long MD = GPU beneficial; validated sm89 runtime |
+| Finite-T MD (long runs) | `1 * NVIDIA L20_48g` | Long MD = GPU beneficial; validated sm89 runtime |

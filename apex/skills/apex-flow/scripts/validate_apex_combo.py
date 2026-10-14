@@ -9,7 +9,7 @@ Usage:
     python validate_apex_combo.py list-combos --backend lammps --prefer gpu
     python validate_apex_combo.py check \\
         --image registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2 \\
-        --scass "c16_m120_1 * NVIDIA L20"
+        --scass "1 * NVIDIA L20_48g"
     python validate_apex_combo.py recommend --backend lammps --prefer cpu
 """
 
@@ -78,7 +78,7 @@ RECOMMENDED_SCASS = {
         "c8_m32_cpu",
     ],
     "lammps_gpu": [
-        "c16_m120_1 * NVIDIA L20",
+        "1 * NVIDIA L20_48g",
         "c8_m32_1 * NVIDIA 4090",
         "c8_m31_1 * NVIDIA T4",
         "c4_m15_1 * NVIDIA T4",

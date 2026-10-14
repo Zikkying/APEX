@@ -206,6 +206,17 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             "registry.example/private/vasp:licensed",
         )
 
+    def test_gpu_machine_defaults_match_distinct_bohrium_catalogs(self):
+        with patch.object(self.gen, "get_bohrium_ticket", return_value="ticket"):
+            legacy = self.gen.build_global_json(
+                "lammps", "deepmd", access_key="key", project_id=42
+            )
+        sandbox = self.gen.build_global_json_sandbox(
+            "lammps", "deepmd", access_key="key", project_id=42
+        )
+        self.assertEqual(legacy["scass_type"], "1 * NVIDIA L20_48g")
+        self.assertEqual(sandbox["machine_type"], "c16_m120_1 * NVIDIA L20")
+
     def test_build_global_json_sandbox_routes_lammps_images(self):
         gpu = self.gen.build_global_json_sandbox(
             "lammps", "deepmd", access_key="key", project_id=42
@@ -666,6 +677,11 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             self.assertEqual((output / "model.pb").read_text(), "model")
             self.assertIn('-n "al-test"', submit.read_text())
             self.assertTrue(submit.stat().st_mode & stat.S_IXUSR)
+            run = (output / "run.sh").read_text()
+            self.assertIn("python3 ensure_apex.py", run)
+            self.assertIn("python3 -m apex submit", run)
+            self.assertNotIn("pip install", run)
+            self.assertTrue((output / "ensure_apex.py").is_file())
             self.assertIn("Workflow name sanitized", stdout.getvalue())
 
     def test_main_dpa4_runtime_profile_is_locked_before_ticket(self):

@@ -18,6 +18,26 @@ from apex.utils import load_config_file
 
 
 class TestAccountConfig(unittest.TestCase):
+    def test_rejects_cross_catalog_l20_including_nested_override(self):
+        with self.assertRaisesRegex(ValueError, "Bohrium jobs require"):
+            Config(context_type="Bohrium", scass_type="c16_m120_1 * NVIDIA L20")
+        with self.assertRaisesRegex(ValueError, "Bohrium jobs require"):
+            Config(context_type="Bohrium", scass_type="1 * NVIDIA L20_48g",
+                   machine={"remote_profile": {"input_data": {
+                       "scass_type": "c16_m120_1 * NVIDIA L20"}}})
+        with self.assertRaisesRegex(ValueError, "OpenAPI Sandbox requires"):
+            Config(context_type="OpenAPI", machine_type="1 * NVIDIA L20_48g")
+        self.assertEqual(
+            Config(context_type="Bohrium", scass_type="1 * NVIDIA L20_48g")
+            .machine_dict["remote_profile"]["input_data"]["scass_type"],
+            "1 * NVIDIA L20_48g",
+        )
+        self.assertEqual(
+            Config(context_type="OpenAPI", machine_type="c16_m120_1 * NVIDIA L20")
+            .machine_dict["remote_profile"]["machine_type"],
+            "c16_m120_1 * NVIDIA L20",
+        )
+
     def test_config_default_lammps_image_is_cpu_safe_runtime(self):
         self.assertEqual(
             Config().lammps_image_name,

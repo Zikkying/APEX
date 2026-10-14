@@ -143,8 +143,10 @@ Options to offer via AskQuestion:
     - `expiration` 单位为**小时**，默认值 `168`（7 天）。`generate_config.py` 已内置此默认值。
     - 返回: `{"code": 0, "data": {"ticket": "UUID"}}`
   - Verify that `global.json` contains a non-empty `bohrium_config.ticket` before submission.
-  - `run.sh` must only install/verify APEX and call `apex submit`. Do not add ticket API calls or depend on `BOHRIUM_ACCESS_KEY` inside the APEX container — 容器内没有此环境变量。
-  - Install with `python3 -m pip install --upgrade --no-cache-dir apex-flow`.
+  - `run.sh` must verify/reuse APEX and call `apex submit`. Do not add ticket API calls or depend on `BOHRIUM_ACCESS_KEY` inside the APEX container — 容器内没有此环境变量。
+  - Package the generated `ensure_apex.py` with `run.sh`. It reuses a working APEX >= 1.3.2 from the image without pip/network access. Only missing or older APEX is bootstrapped with `apex-flow==1.3.2`; CLI failures stop submission.
+  - Use the APEX image for the outer submission client and make/post steps. `dispatcher_image` is only the DPDispatcher launcher; GPU/CPU calculator images are separate.
+  - Ordinary Bohrium jobs use `scass_type="1 * NVIDIA L20_48g"`; OpenAPI Sandbox uses `machine_type="c16_m120_1 * NVIDIA L20"`. Verify against the matching live machine catalog; these names are not interchangeable.
    See `reference/submission.md`.
   - **Installed local edition exception:** follow
     `variants/local/profiles/bohrium-direct.md`; configure AccessKey or
@@ -173,7 +175,7 @@ Options to offer via AskQuestion:
    python scripts/validate_apex_combo.py list-combos --backend lammps --prefer gpu
    python scripts/validate_apex_combo.py check \
      --image registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2 \
-     --scass "c16_m120_1 * NVIDIA L20"
+     --scass "1 * NVIDIA L20_48g"
   ```
    Do **not** hardcode an unverified `scass_type`. Prefer `recommend` / `list-combos` output. Known failures include `deepmd-kit:3.1.0`, `3.1.1-cuda12.1`, `3.1.2`, the combination `deepmd-kit:3.1.1` × `NVIDIA T4`, `c4_m16_cpu`, and `c12_m46_1 * NVIDIA T4`. GPU LAMMPS potentials (`deepmd`, `mace`, `nep`) use `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` with NVIDIA L20 by default; RTX 4090 remains a validated compatible option. CPU LAMMPS potentials use `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post`; never pair 0.0.2 with a `*_cpu` machine because sequential CPU validation stalled before the container command started. `apex submit` only enforces 0.0.2 for GPU-potential phonon and Grüneisen workflows. Do not emit `plugin load libdeepmd_lmp.so` for 0.0.2.
    Do **not** hardcode an unverified `scass_type`. Prefer `recommend` / `list-combos` output. GPU LAMMPS potentials (`deepmd`, `mace`, `nep`) use `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` with NVIDIA L20 by default; RTX 4090 is also validated. CPU LAMMPS potentials use the APEX CPU image. Never pair 0.0.2 with a `*_cpu` machine, and do not emit `plugin load libdeepmd_lmp.so` for its integrated USER-DEEPMD build.
@@ -409,7 +411,7 @@ See `reference/submission.md` for the full validated template.
    uses a hashed image-resident `.pt2` and is generated only after publication.
    Default to `"type_map": "auto"`.
 3. **Joint workflow recommended.** Use `joint` flow (relaxation + properties) for most use cases to ensure proper relaxation before property calculations.
-4. **GPU for ML potentials.** DeePMD, MACE, and NEP benefit from GPU acceleration. Set `scass_type` to a validated GPU SKU from `validate_apex_combo.py recommend --prefer gpu` (default: `"c16_m120_1 * NVIDIA L20"`; RTX 4090 remains compatible).
+4. **GPU for ML potentials.** DeePMD, MACE, and NEP benefit from GPU acceleration. Set `scass_type` to a validated GPU SKU from `validate_apex_combo.py recommend --prefer gpu` (default: `"1 * NVIDIA L20_48g"`; RTX 4090 remains compatible).
 5. **Supercell sizing depends on the input atom count, not only the default JSON.**
    Treat defaults as targets for **unit-cell inputs**. First inspect the user's
    structure; if it is already large enough, prefer `[1,1,1]` after confirmation.
