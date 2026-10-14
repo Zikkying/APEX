@@ -20,3 +20,11 @@ Release date: 2026-10-14
 Existing generated jobs keep their saved scripts and machine settings. Generate
 a fresh job directory using the updated skill before resubmitting; preserve
 existing task outputs and check the original workflow state first.
+
+## 1.3.2.post1
+
+Use the independently snapshotted `apex-flow:1.3.2-post1` client image in
+Bohrium project 397953. The earlier `1.3.2-r1` image reference has an active
+platform build task and must not be used as the release runtime. Missing/old
+clients bootstrap the pinned 1.3.2.post1 package; working 1.3.2 runtimes remain
+compatible and are reused. Runtime functionality is unchanged.

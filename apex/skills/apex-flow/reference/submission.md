@@ -96,7 +96,7 @@ fi
 
 **Key points:**
 - Reuse an installed stable APEX >= 1.3.2 after checking imports and CLI startup. No pip request is made for a working image runtime.
-- The generated `ensure_apex.py` installs `apex-flow==1.3.2` only when missing or older. It fails on broken imports/CLI, and submission uses the same Python interpreter.
+- The generated `ensure_apex.py` installs `apex-flow==1.3.2.post1` only when missing or older. It fails on broken imports/CLI, and submission uses the same Python interpreter.
 - Include `ensure_apex.py` in the packaged outer job. Use the APEX client image, not the dispatcher or GPU calculator image.
 - The installed APEX code is automatically sent to inner dflow steps via `upload_packages`
 - `run.sh` does not access `BOHRIUM_ACCESS_KEY` or modify `global.json`
@@ -119,7 +119,7 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 
 | Role | Image | Notes |
 |------|-------|-------|
-| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1` | Lightweight; just runs `apex submit` |
+| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1` | Lightweight; just runs `apex submit` |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | NVIDIA L20 default; RTX 4090 compatible; includes phonoLAMMPS |
 | **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | EAM/MEAM/SNAP/GAP/RANN CPU backend |
 | **ABACUS calculator** | `registry.dp.tech/dptech/abacus:3.8.2` | Or user-specified |
@@ -215,7 +215,7 @@ The following is a type-annotated shape, not valid JSON:
         "ticket": "<UUID from API conversion — auto-filled by generate_config.py>",
         "project_id": <the same unquoted integer>
     },
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
     "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
     "lammps_run_command": "lmp -in in.lammps",
     "scass_type": "c16_m32_cpu",
@@ -254,7 +254,7 @@ workflow and retrieves its results automatically:
    ```python
    Bohrium(action="submit",
      input_dir="<job_dir>",
-     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
+     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
      machine="c1_m2_cpu",
      cmd="bash run.sh")
    ```

@@ -8,6 +8,7 @@ from importlib import metadata
 
 
 REQUIRED_VERSION = "1.3.2"
+BOOTSTRAP_VERSION = "1.3.2.post1"
 
 
 def release_version(value):
@@ -24,12 +25,12 @@ def ensure_apex():
     version = release_version(installed) if installed else None
     if version is None or version < release_version(REQUIRED_VERSION):
         print(
-            f"APEX {installed or 'missing'}: installing apex-flow=={REQUIRED_VERSION}",
+            f"APEX {installed or 'missing'}: installing apex-flow=={BOOTSTRAP_VERSION}",
             flush=True,
         )
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "--no-cache-dir",
-             f"apex-flow=={REQUIRED_VERSION}"],
+             f"apex-flow=={BOOTSTRAP_VERSION}"],
             check=True,
         )
     else:

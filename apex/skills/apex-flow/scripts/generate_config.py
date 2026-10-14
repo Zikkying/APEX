@@ -55,7 +55,7 @@ SANDBOX_DFLOW_HOST = "https://lbg-workflow-dflow.dp.tech"
 SANDBOX_DISPATCHER_IMAGE = (
     "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811"
 )
-APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1"
+APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1"
 LAMMPS_GPU_IMAGE = (
     "registry.dp.tech/dptech/dp/native/prod-16664/"
     "dpa4-phonolammps:0.0.2"

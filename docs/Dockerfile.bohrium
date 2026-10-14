@@ -8,11 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN python3 -m venv --copies --system-site-packages /opt/apex-venv
 ENV VIRTUAL_ENV=/opt/apex-venv
 ENV PATH="/opt/apex-venv/bin:${PATH}"
-RUN /opt/apex-venv/bin/python -m pip install --no-deps --ignore-installed apex-flow==1.3.2
+RUN /opt/apex-venv/bin/python -m pip install --no-deps --ignore-installed apex-flow==1.3.2.post1
 
 RUN python - <<'PY'
 import apex
-assert apex.__version__ == '1.3.2', apex.__version__
+assert apex.__version__ == '1.3.2.post1', apex.__version__
 from pathlib import Path
 assert (Path(apex.__file__).parent / 'default_config/lammps/param_props.json').is_file()
 print(apex.__version__)

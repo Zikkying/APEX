@@ -79,7 +79,7 @@ Direct
 
 ### Preferred: APEX workflow submission
 ```
-image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1
+image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1
 machine: c1_m2_cpu
 cmd: bash run.sh
 ```
@@ -183,7 +183,7 @@ kspacing        0.15
 
 ### Preferred: APEX workflow submission
 ```
-image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1
+image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1
 machine: c1_m2_cpu
 cmd: bash run.sh
 ```

@@ -18,7 +18,7 @@ DEFAULT_BOHRIUM_CONFIG = {
     "k8s_api_server": BOHRIUM_WORKFLOWS_HOST,
     "batch_type": "Bohrium",
     "context_type": "Bohrium",
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
 }
 
 DEFAULT_OPENAPI_CONFIG = {
@@ -30,7 +30,7 @@ DEFAULT_OPENAPI_CONFIG = {
     "machine_type": "c16_m120_1 * NVIDIA L20",
     "output_log": False,
     "dispatcher_image": SANDBOX_DISPATCHER_IMAGE,
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
 }
 
 SENSITIVE_KEYS = {"password", "access_key", "app_key"}

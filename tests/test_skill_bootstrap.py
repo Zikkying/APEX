@@ -33,7 +33,7 @@ class TestImageRuntimeBootstrap(unittest.TestCase):
                 bootstrap.ensure_apex()
                 install = run.call_args_list[0].args[0]
                 self.assertEqual(install[:4], [sys.executable, "-m", "pip", "install"])
-                self.assertIn("apex-flow==1.3.2", install)
+                self.assertIn("apex-flow==1.3.2.post1", install)
                 self.assertNotIn("--upgrade", install)
 
     def test_broken_cli_fails_without_silent_reinstallation(self):

@@ -144,7 +144,7 @@ Options to offer via AskQuestion:
     - 返回: `{"code": 0, "data": {"ticket": "UUID"}}`
   - Verify that `global.json` contains a non-empty `bohrium_config.ticket` before submission.
   - `run.sh` must verify/reuse APEX and call `apex submit`. Do not add ticket API calls or depend on `BOHRIUM_ACCESS_KEY` inside the APEX container — 容器内没有此环境变量。
-  - Package the generated `ensure_apex.py` with `run.sh`. It reuses a working APEX >= 1.3.2 from the image without pip/network access. Only missing or older APEX is bootstrapped with `apex-flow==1.3.2`; CLI failures stop submission.
+  - Package the generated `ensure_apex.py` with `run.sh`. It reuses a working APEX >= 1.3.2 from the image without pip/network access. Only missing or older APEX is bootstrapped with `apex-flow==1.3.2.post1`; CLI failures stop submission.
   - Use the APEX image for the outer submission client and make/post steps. `dispatcher_image` is only the DPDispatcher launcher; GPU/CPU calculator images are separate.
   - Ordinary Bohrium jobs use `scass_type="1 * NVIDIA L20_48g"`; OpenAPI Sandbox uses `machine_type="c16_m120_1 * NVIDIA L20"`. Verify against the matching live machine catalog; these names are not interchangeable.
    See `reference/submission.md`.
