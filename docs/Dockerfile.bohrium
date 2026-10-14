@@ -5,7 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN python -m pip install apex-flow==1.3.2
+RUN python3 -m venv --copies --system-site-packages /opt/apex-venv
+ENV VIRTUAL_ENV=/opt/apex-venv
+ENV PATH="/opt/apex-venv/bin:${PATH}"
+RUN /opt/apex-venv/bin/python -m pip install --no-deps --ignore-installed apex-flow==1.3.2
 
 RUN python - <<'PY'
 import apex
