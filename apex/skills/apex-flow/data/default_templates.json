@@ -1,5 +1,5 @@
 {
-    "apex_image": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2",
+    "apex_image": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
     "dispatcher_image_sandbox": "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811",
     "backends": {
         "lammps_gpu": {

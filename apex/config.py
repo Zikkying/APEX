@@ -70,7 +70,7 @@ class Config:
     # basic run config
     run_image_name: str = None
     run_command: str = None
-    apex_image_name: str = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2"
+    apex_image_name: str = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1"
     group_size: int = None
     pool_size: int = None
     upload_python_packages: list = field(default_factory=list)

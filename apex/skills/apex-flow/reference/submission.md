@@ -119,7 +119,7 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 
 | Role | Image | Notes |
 |------|-------|-------|
-| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2` | Lightweight; just runs `apex submit` |
+| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1` | Lightweight; just runs `apex submit` |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | NVIDIA L20 default; RTX 4090 compatible; includes phonoLAMMPS |
 | **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | EAM/MEAM/SNAP/GAP/RANN CPU backend |
 | **ABACUS calculator** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | Or user-specified |
@@ -215,7 +215,7 @@ The following is a type-annotated shape, not valid JSON:
         "ticket": "<UUID from API conversion — auto-filled by generate_config.py>",
         "project_id": <the same unquoted integer>
     },
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.2",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
     "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
     "lammps_run_command": "lmp -in in.lammps",
     "scass_type": "c16_m32_cpu",
