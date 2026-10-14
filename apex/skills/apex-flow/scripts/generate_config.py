@@ -714,7 +714,7 @@ def build_global_json(backend: str, potential: str = None,
 
     # Add backend-specific image fields
     if backend == "abacus":
-        config["abacus_image_name"] = LAMMPS_CPU_IMAGE
+        config["abacus_image_name"] = ABACUS_IMAGE
         config["abacus_run_command"] = calc_run_command
     elif backend == "vasp":
         # Never invent a VASP image — commercial license required.
@@ -749,6 +749,9 @@ def build_global_json_sandbox(backend: str, potential: str = None,
             "BOHRIUM_ACCESS_KEY environment variable not set and --access-key "
             "not provided. Required for OpenAPI Sandbox mode."
         )
+
+    if backend == "vasp" and not (vasp_image or "").strip():
+        raise ValueError("OpenAPI VASP requires an explicitly authorized vasp_image")
 
     # Determine machine_type for inner containers
     if machine_type:
@@ -802,7 +805,7 @@ def build_global_json_sandbox(backend: str, potential: str = None,
         "app_key": os.environ.get("BOHRIUM_APP_KEY", "agent"),
         "platform": "ali",
         "machine_type": inner_machine,
-        "image_address": selected_lammps_image if backend == "lammps" else ABACUS_IMAGE if backend == "abacus" else APEX_IMAGE,
+        "image_address": selected_lammps_image if backend == "lammps" else ABACUS_IMAGE if backend == "abacus" else vasp_image.strip(),
         "output_log": False,
         "dispatcher_image": SANDBOX_DISPATCHER_IMAGE,
         "bohrium_config": {
@@ -819,7 +822,7 @@ def build_global_json_sandbox(backend: str, potential: str = None,
 
     # Add backend-specific image fields
     if backend == "abacus":
-        config["abacus_image_name"] = LAMMPS_CPU_IMAGE
+        config["abacus_image_name"] = ABACUS_IMAGE
         config["abacus_run_command"] = calc_run_command
     elif backend == "vasp":
         config["vasp_run_command"] = calc_run_command
@@ -895,7 +898,7 @@ def validate_project_id_types(config: dict) -> int:
 
 def refresh_global_json(global_path, access_key: str = None,
                         project_id: int = None) -> dict:
-    """Refresh ticket and integer project IDs without touching param.json."""
+    """Refresh the selected backend credentials without touching param.json."""
     path = Path(global_path)
     if not path.is_file():
         raise FileNotFoundError(f"global.json not found: {path}")
@@ -912,18 +915,23 @@ def refresh_global_json(global_path, access_key: str = None,
             "BOHRIUM_ACCESS_KEY environment variable not set and --access-key "
             "not provided. Cannot refresh dflow authentication."
         )
-    ticket = get_bohrium_ticket(key)
-
-    config["program_id"] = pid
     bohrium_config = config.setdefault("bohrium_config", {})
     if not isinstance(bohrium_config, dict):
         raise ValueError("global.json bohrium_config must be a JSON object")
-    bohrium_config["project_id"] = pid
-    bohrium_config["ticket"] = ticket
-
-    machine = config.get("machine")
-    if isinstance(machine, dict):
-        remote_profile = machine.get("remote_profile")
+    machine = config.get("machine") or {}
+    remote_profile = machine.get("remote_profile") if isinstance(machine, dict) else None
+    if str(config.get("context_type", "")).lower() == "openapi":
+        config["access_key"] = key
+        config["project_id"] = pid
+        bohrium_config["access_key"] = key
+        bohrium_config["project_id"] = pid
+        if isinstance(remote_profile, dict):
+            remote_profile.update(access_key=key, project_id=pid)
+    else:
+        ticket = get_bohrium_ticket(key)
+        config["program_id"] = pid
+        bohrium_config["project_id"] = pid
+        bohrium_config["ticket"] = ticket
         if isinstance(remote_profile, dict) and "program_id" in remote_profile:
             remote_profile["program_id"] = pid
 
@@ -1973,7 +1981,8 @@ def main():
         pid = validate_project_id_types(config)
         print(f"Refreshed: {Path(args.global_json).resolve()}")
         print("Hard type check passed:")
-        print(f"  program_id={pid!r} type={type(pid).__name__}")
+        id_field = "project_id" if str(config.get("context_type", "")).lower() == "openapi" else "program_id"
+        print(f"  {id_field}={pid!r} type={type(pid).__name__}")
         project_id = config["bohrium_config"]["project_id"]
         print(
             "  bohrium_config.project_id="

@@ -11,6 +11,9 @@ Release date: 2026-10-14
   the distinct OpenAPI Sandbox SKU `c16_m120_1 * NVIDIA L20`.
 - Update the outer client and make/post image to APEX 1.3.2. Preserve the
   separate CPU/GPU calculator images and the OpenAPI dispatcher image.
+- Align Sandbox ABACUS/VASP calculator and dispatcher image addresses, refresh
+  Sandbox access-key configuration without using the legacy ticket API, and
+  respect explicitly selected contexts when merging account defaults.
 - Align cloud skill instructions, examples, templates, and regression coverage
   with image reuse and the separate machine catalogs.
 

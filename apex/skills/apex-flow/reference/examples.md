@@ -79,9 +79,9 @@ Direct
 
 ### Preferred: APEX workflow submission
 ```
-image: registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post
+image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1
 machine: c1_m2_cpu
-cmd: apex submit param.json -c global.json -f joint -n "mo-bcc-eos-elastic" > log 2>&1
+cmd: bash run.sh
 ```
 
 Use `apex submit` for production and Bohrium workflows. It delegates the
@@ -183,9 +183,9 @@ kspacing        0.15
 
 ### Preferred: APEX workflow submission
 ```
-image: registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post
+image: registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1
 machine: c1_m2_cpu
-cmd: apex submit param.json -c global.json -f joint -n "cu-fcc-surface-vacancy" > log 2>&1
+cmd: bash run.sh
 ```
 
 Use `apex submit` for production and Bohrium workflows. The calculator resources

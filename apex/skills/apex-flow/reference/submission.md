@@ -29,7 +29,7 @@ APEX uses a **two-layer submission architecture**:
 │  Inner containers (managed by dflow on Bohrium)                 │
 │  - GPU LAMMPS: dpa4-phonolammps:0.0.2                        │
 │  - CPU LAMMPS: apex-flow:1.3.0.post                          │
-│  - ABACUS image: registry.dp.tech/dptech/abacus:3.2.3          │
+│  - ABACUS image: registry.dp.tech/dptech/abacus:3.8.2          │
 │  - VASP image: (user-provided)                                  │
 │  - Machine type per task: scass_type in global.json             │
 │  - APEX code: received via upload_packages (client version)      │
@@ -122,7 +122,7 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 | **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1` | Lightweight; just runs `apex submit` |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | NVIDIA L20 default; RTX 4090 compatible; includes phonoLAMMPS |
 | **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | EAM/MEAM/SNAP/GAP/RANN CPU backend |
-| **ABACUS calculator** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | Or user-specified |
+| **ABACUS calculator** | `registry.dp.tech/dptech/abacus:3.8.2` | Or user-specified |
 | **VASP calculator** | User must provide after confirming license | Commercial; **never invent a default image** |
 
 > Legacy `deepmd-kit:3.1.1` remains blocked with NVIDIA T4 and for triclinic
@@ -254,9 +254,9 @@ workflow and retrieves its results automatically:
    ```python
    Bohrium(action="submit",
      input_dir="<job_dir>",
-     image="registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post",
+     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-r1",
      machine="c1_m2_cpu",
-     cmd='apex submit param.json -c global.json -f joint -n "cu-fcc-elastic" > log 2>&1')
+     cmd="bash run.sh")
    ```
    Parse and retain the workflow ID printed in the submission log. The outer
    Bohrium job remains active until the inner dflow workflow completes.

@@ -104,6 +104,9 @@ def mask_sensitive_config(config: dict) -> dict:
 
 def _is_openapi_context(config_dict: dict) -> bool:
     """Check if config explicitly requests OpenAPI Sandbox mode."""
+    context = config_dict.get("context_type")
+    if isinstance(context, str) and context.strip():
+        return context.lower() == "openapi"
     for key in ("context_type", "batch_type"):
         value = config_dict.get(key)
         if isinstance(value, str) and value.lower() == "openapi":

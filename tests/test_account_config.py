@@ -18,6 +18,16 @@ from apex.utils import load_config_file
 
 
 class TestAccountConfig(unittest.TestCase):
+    def test_explicit_legacy_context_is_not_changed_by_machine_type(self):
+        with patch.dict(os.environ, {"APEX_ACCOUNT_FILE": "/tmp/nonexistent-apex-account.json"}):
+            config = merge_bohrium_defaults({
+                "context_type": "Bohrium", "batch_type": "Bohrium",
+                "machine_type": "c16_m120_1 * NVIDIA L20",
+                "scass_type": "1 * NVIDIA L20_48g",
+            })
+        self.assertEqual(config["context_type"], "Bohrium")
+        self.assertNotIn("dispatcher_image", config)
+
     def test_rejects_cross_catalog_l20_including_nested_override(self):
         with self.assertRaisesRegex(ValueError, "Bohrium jobs require"):
             Config(context_type="Bohrium", scass_type="c16_m120_1 * NVIDIA L20")

@@ -238,6 +238,36 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             self.gen.SANDBOX_MACHINE_TYPES["lammps_cpu"],
         )
 
+    def test_sandbox_calculator_and_dispatcher_images_agree(self):
+        abacus = self.gen.build_global_json_sandbox("abacus", access_key="key", project_id=42)
+        self.assertEqual(abacus["image_address"], self.gen.ABACUS_IMAGE)
+        self.assertEqual(abacus["abacus_image_name"], abacus["image_address"])
+        with self.assertRaisesRegex(ValueError, "authorized vasp_image"):
+            self.gen.build_global_json_sandbox("vasp", access_key="key", project_id=42)
+        image = "registry.example/private/vasp:licensed"
+        vasp = self.gen.build_global_json_sandbox(
+            "vasp", access_key="key", project_id=42, vasp_image=image
+        )
+        self.assertEqual(vasp["image_address"], image)
+        self.assertEqual(vasp["vasp_image_name"], image)
+
+    def test_refresh_sandbox_credentials_without_ticket_api(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "global.json"
+            path.write_text(json.dumps({
+                "context_type": "OpenAPI", "access_key": "old", "project_id": 7,
+                "bohrium_config": {"access_key": "old", "project_id": 7},
+                "machine": {"remote_profile": {"access_key": "old", "project_id": 7}},
+            }))
+            with patch.object(self.gen, "get_bohrium_ticket") as ticket:
+                updated = self.gen.refresh_global_json(path, access_key="new", project_id=42)
+            ticket.assert_not_called()
+            self.assertEqual(updated["access_key"], "new")
+            self.assertEqual(updated["bohrium_config"]["access_key"], "new")
+            self.assertEqual(updated["machine"]["remote_profile"]["project_id"], 42)
+            self.assertNotIn("ticket", updated["bohrium_config"])
+            self.assertEqual(json.loads(path.read_text()), updated)
+
     def test_explicit_lammps_image_supports_cpu_deepmd(self):
         image = (
             "registry.dp.tech/dptech/dp/native/prod-397637/"
