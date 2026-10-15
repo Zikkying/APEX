@@ -9,10 +9,15 @@ RUN echo 'c908437b8683180e7ee98a85a04f9457998017a943deef075b71d4910a39384c  /tmp
     && ln -sf /opt/lammps-sm89/lib/liblammps.so.0 /opt/lammps-sm89/lib/liblammps_dpa4.so
 # Remove development environments, failed-job artifacts and caches, preserving
 # the editable DeepMD source, native libraries, Mamba runtime and CUDA toolkit.
-RUN rm -rf /root/miniconda3 /root/apex_dpa4_cu_test /root/cmake-4.0.0 \
+RUN mkdir -p /tmp/preserved-conda-libs \
+    && cp -a /root/miniconda3/lib/lib*.so* /tmp/preserved-conda-libs/ \
+    && rm -rf /root/miniconda3 /root/apex_dpa4_cu_test /root/cmake-4.0.0 \
     /root/.pixi /root/.cache /root/.triton /root/Software/k_SRME \
     /root/Software/lammps /opt/lammps-sm120 /opt/lammps-sm89/share \
-    /opt/mamba/pkgs /tmp/* /var/cache/apt/archives/* \
+    /opt/mamba/pkgs /var/cache/apt/archives/* \
+    && mkdir -p /root/miniconda3/lib \
+    && cp -a /tmp/preserved-conda-libs/. /root/miniconda3/lib/ \
+    && rm -rf /tmp/* \
     && bytes=$(du --apparent-size -s -B1 --exclude=/proc --exclude=/sys --exclude=/dev / | cut -f1) \
     && echo "Final runtime filesystem bytes: $bytes (limit 35000000000)" \
     && test "$bytes" -lt 35000000000

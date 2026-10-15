@@ -14,11 +14,28 @@
     "/root/apex_dpa4_cu_test": 4212425371
   },
   "status": "slim_build_pending_registry_and_gpu_acceptance",
-  "build_id": 178354,
+  "build_id": 178359,
   "notes": [
     "Directory sizes are nested and must not all be summed.",
     "Bohrium lazy image filesystem requires du without -x to include mounted file content.",
     "The CPU filesystem audit does not qualify GPU execution.",
-    "Prior snapshot failures returned empty logs; their exact cause remains unconfirmed."
-  ]
+    "Prior snapshot failures returned empty logs; their exact cause remains unconfirmed.",
+    "The initial CPU pruning trial removed required native libraries; the revised recipe preserves lib*.so* at their original paths and passed an L20 run."
+  ],
+  "post_prune_l20_sandbox_apparent_bytes_with_runtime": 27938301086,
+  "preserved_miniconda_shared_libraries_bytes": 157705560,
+  "l20_pruned_runtime_smoke": {
+    "atoms": 108,
+    "composition": "Fe36Co36Ni36",
+    "model_and_native_file_hashes": "matched",
+    "lammps_exit_code": 0
+  },
+  "pruned_phonolammps": {
+    "exit_code": 0,
+    "atom_count": 16,
+    "finite_values": 2304,
+    "matrix_blocks": 256,
+    "force_constants_validation": "passed",
+    "qualification_status": "inconclusive_missing_image_digest"
+  }
 }

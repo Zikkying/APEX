@@ -74,7 +74,8 @@ The download endpoint may be removed once the ADD step completes; it must not
 serve credentials or unrelated workspace files.
 
 Diagnostic build 178341 and untrimmed candidate 178347 were superseded and
-deleted. Trimmed candidate 178354 was submitted on 2026-10-15. Receipts and
+deleted. Initial trimmed candidate 178354 was also withdrawn after dependency review.
+Revised candidate 178359 was submitted on 2026-10-15. Receipts and
 logs are stored in `output/dpa4-l20-20261015/`.
 The diagnostic log confirms successful base-registry authentication and large
 historical image layers (49.41 GB of compressed layer sizes visible in the log).
@@ -82,11 +83,15 @@ This does not establish the cause of the earlier
 empty-log snapshot failures.
 
 The publication limit is 40 GB. The Dockerfile fails if the final filesystem is
-35,000,000,000 bytes or larger before flattening. A fresh CPU audit measured
-26,901,603,302 bytes after pruning, before adding the runtime payload. Retained
+35,000,000,000 bytes or larger before flattening. An initial CPU audit measured
+26,901,603,302 bytes, but missed native dependencies in Miniconda. The corrected
+recipe preserves `/root/miniconda3/lib/lib*.so*` (157,705,560 bytes), including
+LAMMPS dependencies JPEG, PNG, FFTW and zlib. A real L20 sandbox measured
+27,938,301,086 bytes with models and passed the 108-atom FeCoNi single-point
+run with matching runtime hashes. This remains source-sandbox evidence. Retained
 components include `/opt/mamba`, CUDA 12.8, `/opt/lammps-sm89`, editable DeepMD
 source and its native libraries. Removed components include the separate
-7.84 GB Miniconda environment, 4.21 GB APEX development/test tree, CMake test
+Python/development content of the 7.84 GB Miniconda environment, 4.21 GB APEX development/test tree, CMake test
 sources, unrelated LAMMPS build sources/SM120 installation and compiler caches.
 A sandbox filesystem audit must not use `du -x`: Bohrium's lazy image files can
 have a different filesystem device ID and would be skipped. Use apparent sizes
