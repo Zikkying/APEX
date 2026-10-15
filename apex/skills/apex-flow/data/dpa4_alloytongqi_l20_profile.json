@@ -1,11 +1,11 @@
 {
     "schema_version": 1,
     "profile_id": "dpa4-alloytongqi-l20",
-    "description": "DPA4 alloytongqi runtime compiled and tested for one NVIDIA L20 SM 8.9; awaiting exact-image qualification.",
+    "description": "Published alloytongqi L20 runtime; enabled by maintainer request, end-to-end qualification pending.",
     "qualification_status": "pre_snapshot_only",
     "image": {
-        "ref": "registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-02",
-        "digest": "__DPA4_IMAGE_DIGEST__"
+        "ref": "registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02",
+        "digest": "sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d"
     },
     "calculator": {
         "backend": "lammps",
@@ -53,5 +53,10 @@
             "Other L20 SKUs: require their own execution receipts."
         ],
         "unknown_policy": "fail_closed"
+    },
+    "release_status": "enabled_pending_e2e",
+    "release_evidence": {
+        "bohrium_build_id": 178359,
+        "qualification_scope": "Source L20 runtime tested; published-image and dflow end-to-end acceptance pending."
     }
 }

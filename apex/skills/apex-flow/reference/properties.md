@@ -319,9 +319,16 @@ Quick primary picks when the user has not specified a system (still confirm):
 
 | Structure | plane_miller | slip_direction |
 |---|---|---|
-| FCC {111} | `[1,1,1]` | `[-1,1,0]` |
+| FCC {111}, Shockley partial / intrinsic stacking fault | `[1,1,1]` | `[1,1,-2]` |
+| FCC {111}, perfect-dislocation direction | `[1,1,1]` | `[-1,1,0]` |
 | BCC {110} | `[1,1,0]` | `[-1,1,1]` |
 | HCP basal | see README §4.10 (Miller–Bravais OK for `gamma`) | see README §4.10 |
+
+For FCC Shockley partials, use `slip_direction: [1,1,-2]` (registry
+`111x11-2`); the partial Burgers vector is `a/6[1,1,-2]`. The in-plane
+`[-1,1,0]` direction belongs to `<110>` and must not be labeled Shockley.
+Direction alone does not set displacement magnitude: retain APEX geometry
+metadata and verify the sampled displacement reaches the intended partial.
 
 **INVALID examples** (will produce wrong results or error):
 - `[1,1,1]` + `[1,1,0]` → dot product = 2 ≠ 0, **NOT on the plane**

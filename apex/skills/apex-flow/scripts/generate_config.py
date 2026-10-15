@@ -2029,6 +2029,8 @@ def main():
     if args.runtime_profile:
         try:
             runtime_profile = _load_dpa4_runtime_profile(args.runtime_profile)
+            if runtime_profile.get("enabled_pending_e2e"):
+                print("NOTICE: tongqi release enabled; published-image and dflow E2E qualification pending.", file=sys.stderr)
         except (OSError, ValueError, RuntimeError) as exc:
             errors.append(str(exc))
         if args.backend != "lammps":

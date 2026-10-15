@@ -1,5 +1,27 @@
 # APEX LAMMPS Potential Types — Detailed Reference
 
+## Published alloytongqi L20 runtime
+
+For the bundled **DPA4-alloytongqi** checkpoint, select
+`--runtime-profile dpa4-alloytongqi-l20`. Its canonical image is
+`registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02`
+at `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
+Use the profile's wrappers and model hashes. This release is enabled, with
+published-image and dflow end-to-end qualification still pending.
+
+The `dpa4-phonolammps:0.0.2` references below describe the generic GPU/base
+image, not the bundled alloytongqi deployment. Do not switch a tongqi job to
+that base image, a different checkpoint, or CPU to recover a failed submission.
+DPA4-Neo-OMat24 is a different model; its release date or element count does
+not describe the bundled alloytongqi checkpoint.
+
+The outer APEX client may use `c1_m2_cpu`. The inner tongqi calculator must
+retain `1 * NVIDIA L20_48g` for Bohrium job submission. Report both roles and
+verify the inner job receipt before claiming L20 execution. The sandbox SKU
+`c16_m120_1 * NVIDIA L20` is a separate backend identifier; do not put it in
+legacy job `scass_type`. OpenAPI qualification remains a separate gate.
+
+
 ## Overview
 
 APEX supports 10 LAMMPS potential types through the `interaction.type` field. Each maps to a specific LAMMPS `pair_style` and requires corresponding model/parameter files.
