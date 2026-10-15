@@ -328,3 +328,23 @@ workflow and retrieves its results automatically:
 ## Machine catalogs
 
 Legacy Bohrium jobs (`context_type=Bohrium`) use `scass_type="1 * NVIDIA L20_48g"`. OpenAPI Sandbox uses `machine_type="c16_m120_1 * NVIDIA L20"`. Check `bohr machine list -c gpu -s job` and `bohr sandbox machine list --choose-type gpu`, respectively; do not copy identifiers between the two catalogs.
+
+### Required submission and Python runtime contract
+
+- Submit through `python -m apex submit ...` (or `submit_from_args`), which expands
+  `interaction.type_map="auto"` from all resolved structures before building dflow.
+  Never call `submit_workflow` with unresolved `auto`. Custom Python integrations
+  must first call `auto_fill_type_map_from_poscar(parameter_dict, param_path)` for
+  every parameter file, using its real path; this also persists the explicit map.
+  Do not guess a map or omit property-specific interactions. The low-level API
+  rejects unresolved maps before any cloud submission.
+- Tongqi OpenAPI must set `dispatcher_remote_command` to exactly
+  `/usr/local/bin/dpa4-python`. This wrapper selects `/opt/mamba/bin/python` and
+  the validated native-library environment. Never replace it with `python3`,
+  `/usr/bin/python3`, or a different Conda interpreter. Generator and core
+  validation enforce this independently of Agent instructions.
+- The calculation image must contain `numpy`, `monty`, and `ruamel.yaml` in that
+  same wrapper environment. APEX's task upload supports the existing slim02
+  image; it is not a substitute for dependency checks when building a new image.
+  A new image digest requires a new real acceptance run before replacing the
+  currently accepted digest. Do not run pip install in calculator jobs.

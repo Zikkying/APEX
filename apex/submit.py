@@ -1061,6 +1061,16 @@ def submit_workflow(
     labels=None
 ):
     validate_submit_paths(parameter_dicts)
+    # The low-level API has no parameter-file base path for safe auto expansion.
+    # Require callers to use the CLI adapter before any cloud side effects.
+    for parameter in parameter_dicts:
+        for interaction in _iter_lammps_interactions_for_type_map(parameter):
+            if interaction.get("type_map") in (None, "", "auto"):
+                raise ValueError(
+                    "Unresolved LAMMPS type_map: use apex submit / submit_from_args, "
+                    "or call auto_fill_type_map_from_poscar(parameter_dict, param_path) "
+                    "before submit_workflow; do not send type_map='auto' to dflow."
+                )
 
     # config dflow_config and s3_config
     wf_config = Config(**config_dict)

@@ -56,3 +56,11 @@ class TestTongqiOpenAPI(unittest.TestCase):
                 normalize_job_detail(detail,"a")
         compile(dispatcher_pre_script(),"<dispatcher-pre-script>","exec")
         self.assertIn("_APEXOpenAPIJob.detail",self.config().get_executor(self.config().dispatcher_config_dict).pre_script)
+
+class TestLowLevelTypeMapGuard(unittest.TestCase):
+    def test_unresolved_map_rejected_before_config_or_cloud(self):
+        from apex.submit import submit_workflow
+        for value in (None, "", "auto"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "submit_from_args"):
+                submit_workflow([{"structures": ["confs/*"], "interaction": {
+                    "type": "deepmd", "type_map": value}}], {}, ["."], "relax")

@@ -13,6 +13,7 @@ export PATH=/usr/local/bin:/opt/mamba/bin:$PATH
 PYTHON=/usr/local/bin/dpa4-python
 MODEL_DIR=/opt/dpa4-runtime/models/DPA4-alloytongqi
 "$PYTHON" - <<'PY'
+import numpy, monty, ruamel.yaml
 import hashlib, json
 from pathlib import Path
 manifest = json.loads(Path('/opt/dpa4-runtime/build-manifest.json').read_text())

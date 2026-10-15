@@ -541,3 +541,23 @@ Successfully validated workflow (ID: `cu-fcc-elastic-v3-joint-sdfml`):
 | `reference/examples.md`          | Complete worked examples for common scenarios                                                                                                         |
 
 OpenAPI bootstrap: `ensure_apex.py` reuses APEX >= 1.3.3. Older runtimes install the immutable verified commit `7d867f4e8ef06e22708b0e151cc48571c4bf53a0` from Zikkying/APEX once; this source bootstrap does not depend on a PyPI release.
+
+### Required submission and Python runtime contract
+
+- Submit through `python -m apex submit ...` (or `submit_from_args`), which expands
+  `interaction.type_map="auto"` from all resolved structures before building dflow.
+  Never call `submit_workflow` with unresolved `auto`. Custom Python integrations
+  must first call `auto_fill_type_map_from_poscar(parameter_dict, param_path)` for
+  every parameter file, using its real path; this also persists the explicit map.
+  Do not guess a map or omit property-specific interactions. The low-level API
+  rejects unresolved maps before any cloud submission.
+- Tongqi OpenAPI must set `dispatcher_remote_command` to exactly
+  `/usr/local/bin/dpa4-python`. This wrapper selects `/opt/mamba/bin/python` and
+  the validated native-library environment. Never replace it with `python3`,
+  `/usr/bin/python3`, or a different Conda interpreter. Generator and core
+  validation enforce this independently of Agent instructions.
+- The calculation image must contain `numpy`, `monty`, and `ruamel.yaml` in that
+  same wrapper environment. APEX's task upload supports the existing slim02
+  image; it is not a substitute for dependency checks when building a new image.
+  A new image digest requires a new real acceptance run before replacing the
+  currently accepted digest. Do not run pip install in calculator jobs.

@@ -272,6 +272,7 @@ class TestSubmitPathValidation(unittest.TestCase):
                 }
             ],
         }
+        props["properties"][0]["cal_setting"]["overwrite_interaction"]["type_map"] = {"Ti": 0}
         with tempfile.TemporaryDirectory() as work_dir, patch.object(
             submit_module,
             "_load_dpa4_profile",
