@@ -328,6 +328,8 @@ class TestGenerateConfigHelpers(unittest.TestCase):
                 )
 
     def test_unpublished_dpa4_profile_fails_closed_before_ticket(self):
+        profile = json.loads((get_skill_root() / "data" / "dpa4_alloytongqi_l20_profile.json").read_text())
+        profile.pop("release_status", None)
         with patch.object(self.gen, "get_bohrium_ticket") as ticket:
             with self.assertRaisesRegex(RuntimeError, "not published"):
                 self.gen.build_global_json(
@@ -335,7 +337,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
                     "deepmd",
                     access_key="key",
                     project_id=42,
-                    runtime_profile=self.gen.DPA4_RUNTIME_PROFILE,
+                    runtime_profile=profile,
                 )
         ticket.assert_not_called()
 
@@ -746,7 +748,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
                 "--access-key", "key",
             ]
             stderr = io.StringIO()
-            with patch.object(sys, "argv", argv), patch.object(
+            with patch.object(self.gen, "_load_dpa4_runtime_profile", side_effect=RuntimeError("not published")), patch.object(sys, "argv", argv), patch.object(
                 self.gen, "get_bohrium_ticket"
             ) as ticket, patch("sys.stderr", stderr), patch(
                 "sys.stdout", io.StringIO()
@@ -1230,7 +1232,7 @@ class TestValidateInputs(unittest.TestCase):
             )
         self.assertTrue(any("runtime_model_sha256" in error for error in errors))
         self.assertTrue(any("cannot mix legacy" in error for error in errors))
-        self.assertTrue(any("not finalized" in error for error in errors))
+        self.assertTrue(any("immutable image" in error for error in errors))
 
     def test_validate_global(self):
         errors, warnings = self.validator.validate_global({})
@@ -2042,12 +2044,12 @@ class TestDpa4Profile(unittest.TestCase):
     def setUpClass(cls):
         cls.profile_mod = _load_script("dpa4_profile.py")
 
-    def test_bundled_profile_is_pre_snapshot_and_fails_closed(self):
+    def test_bundled_profile_enabled_without_claiming_qualification(self):
         profile = self.profile_mod.load_dpa4_profile(
             require_published=False
         )
-        self.assertFalse(profile["published"])
-        self.assertFalse(profile["identity_finalized"])
+        self.assertTrue(profile["published"])
+        self.assertTrue(profile["identity_finalized"])
         self.assertFalse(profile["qualified"])
         self.assertEqual(
             profile["machine_compatibility"]["recommended"][0][
@@ -2063,8 +2065,11 @@ class TestDpa4Profile(unittest.TestCase):
             profile["calculator"]["phonolammps_command"],
             self.profile_mod.DPA4_PHONOLAMMPS_RUN_COMMAND,
         )
+        self.assertTrue(profile["enabled_pending_e2e"])
+        self.profile_mod.load_dpa4_profile(require_published=True)
+        profile.pop("release_status")
         with self.assertRaisesRegex(RuntimeError, "not published"):
-            self.profile_mod.load_dpa4_profile(require_published=True)
+            self.profile_mod.validate_dpa4_profile(profile)
 
     def test_published_profile_produces_exact_image_and_interaction(self):
         source = json.loads(
@@ -2168,42 +2173,17 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
                     self.assertEqual(self.combo.main(argv), 0)
                 self.assertIn(expected, stdout.getvalue())
 
-    def test_dpa4_unpublished_profile_lists_candidate_but_never_recommends(self):
-        data = self.combo.list_combos(
-            runtime_profile=self.combo.DPA4_RUNTIME_PROFILE
-        )
-        self.assertEqual(data["status"], "unpublished")
-        self.assertIsNone(data["recommended"])
-        self.assertEqual(
-            data["candidate_after_publish"]["scass_type"],
-            "1 * NVIDIA L20_48g",
-        )
-        self.assertTrue(any(
-            "RTX 4090" in item for item in data["unverified"]
-        ))
-        with self.assertRaisesRegex(RuntimeError, "not published"):
-            self.combo.recommend(
-                runtime_profile=self.combo.DPA4_RUNTIME_PROFILE
-            )
-
+    def test_enabled_dpa4_profile_recommends_l20_and_rejects_other_image(self):
+        data = self.combo.list_combos(runtime_profile=self.combo.DPA4_RUNTIME_PROFILE)
+        self.assertEqual(data["status"], "published")
+        self.assertIsNotNone(data["recommended"])
         ok, errors = self.combo.check_combo(
             "registry.example/dpa4:tag@sha256:" + "a" * 64,
             "1 * NVIDIA L20_48g",
             runtime_profile=self.combo.DPA4_RUNTIME_PROFILE,
         )
         self.assertFalse(ok)
-        self.assertTrue(any("not published" in error for error in errors))
-
-        stdout = io.StringIO()
-        with patch("sys.stdout", stdout):
-            self.assertEqual(self.combo.main([
-                "list-combos",
-                "--runtime-profile", self.combo.DPA4_RUNTIME_PROFILE,
-            ]), 0)
-        text = stdout.getvalue()
-        self.assertIn("recommendation: LOCKED", text)
-        self.assertIn("Prohibited classes:", text)
-        self.assertIn("multi_gpu", text)
+        self.assertTrue(errors)
 
     def test_dpa4_exact_combo_rejects_unverified_gpu_and_multi_rank(self):
         profile = {

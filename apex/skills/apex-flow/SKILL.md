@@ -78,7 +78,10 @@ Options to offer via AskQuestion:
     report. Keep this old image as the general APEX default and the legacy
     phonon/Grüneisen forced image; do not submit DPA4 through it.
   - For DPA4, use `--runtime-profile dpa4-alloytongqi-l20`. The generator
-    requires the exact image digest and `post_snapshot_passed` evidence.
+    uses the pinned published image from the profile. The maintainer has enabled
+    this release with `release_status: enabled_pending_e2e`; its
+    `qualification_status: pre_snapshot_only` remains truthful. Do not report
+    published-image or end-to-end acceptance as passed until receipts exist.
     T4 is absent from the sandbox catalog checked on 2026-10-15; historical
     T4 results do not qualify L20. Never transplant a T4 `.pt2`.
     Once published, the generator must write

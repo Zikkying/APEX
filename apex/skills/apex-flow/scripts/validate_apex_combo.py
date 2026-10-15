@@ -309,6 +309,7 @@ def list_combos(
                 "published" if profile["published"] else "unpublished"
             ),
             "qualification_status": profile.get("qualification_status"),
+            "release_status": profile.get("release_status"),
             "recommended": (
                 recommend(runtime_profile=runtime_profile)
                 if profile["published"] else None
@@ -319,8 +320,8 @@ def list_combos(
             "unverified": compatibility["unverified"],
             "unknown_policy": compatibility["unknown_policy"],
             "note": (
-                "Pre-snapshot evidence is not a recommendation. Exact "
-                "ref@digest post-snapshot qualification is still required."
+                "Release enablement and qualification are separate. Check "
+                "qualification_status before claiming end-to-end acceptance."
             ),
         }
     rec = recommend(backend, prefer)

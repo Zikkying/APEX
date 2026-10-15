@@ -114,9 +114,8 @@ class TestSubmitPathValidation(unittest.TestCase):
         )
         self.assertEqual(selected, configured)
 
-    def test_dpa4_image_placeholders_fail_closed(self):
-        with self.assertRaisesRegex(RuntimeError, "not published"):
-            submit_module._dpa4_image_name()
+    def test_dpa4_released_image_and_invalid_runtime(self):
+        self.assertIn("20261015-slim02@sha256:", submit_module._dpa4_image_name())
 
         partial = self._dpa4_interaction()
         partial["deepmd_runtime"] = "legacy"
