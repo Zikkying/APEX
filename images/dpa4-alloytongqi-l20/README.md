@@ -4,11 +4,14 @@ Work in progress: not qualified for production until the published image digest
 passes the L20 v3 benchmark. Do not change the production profile based on a
 successful source-sandbox run alone.
 
-Publication is blocked as of 2026-10-15: Bohrium snapshots 178312 and 178321
-(L20 source sandbox) and 178333 (clean CPU assembly) returned status 3 with
-empty build logs. No immutable image digest or fresh-image acceptance was
-obtained. The profile remains locked; these changes are not a production
-runtime release.
+Published on 2026-10-15 by Bohrium build 178359:
+`registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02`
+Digest: `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
+The registry independently confirms this digest and 13,804,813,479 compressed
+layer bytes (Bohrium displays 12.86 GB). The build filesystem is 27,128,979,232
+bytes. Fresh-image L20 acceptance is pending sandbox image preparation.
+Earlier snapshot attempts 178312, 178321 and 178333 failed with empty logs;
+the flattened Dockerfile build resolves the publication blocker.
 
 Base: `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`.
 Target: single NVIDIA L20, compute capability 8.9, one MPI rank.

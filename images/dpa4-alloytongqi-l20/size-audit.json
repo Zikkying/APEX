@@ -13,7 +13,7 @@
     "/root/miniconda3": 7840467102,
     "/root/apex_dpa4_cu_test": 4212425371
   },
-  "status": "slim_build_pending_registry_and_gpu_acceptance",
+  "status": "published_pending_fresh_image_gpu_acceptance",
   "build_id": 178359,
   "notes": [
     "Directory sizes are nested and must not all be summed.",
@@ -37,5 +37,11 @@
     "matrix_blocks": 256,
     "force_constants_validation": "passed",
     "qualification_status": "inconclusive_missing_image_digest"
-  }
+  },
+  "dockerfile_build_final_apparent_bytes": 27128979232,
+  "dockerfile_runtime_hash_and_package_validation": "passed",
+  "published_image_ref": "registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02",
+  "published_image_digest": "sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d",
+  "registry_compressed_layer_bytes": 13804813479,
+  "bohrium_display_size": "12.86GB"
 }
