@@ -342,7 +342,8 @@ def _validate_dpa4_execution_config(
     errors = []
     context_type = str(wf_config.context_type or "").lower()
     batch_type = str(wf_config.batch_type or "").lower()
-    if "bohrium" not in context_type or "bohrium" not in batch_type:
+    openapi = context_type == "openapi" and batch_type == "openapi"
+    if not openapi and ("bohrium" not in context_type or "bohrium" not in batch_type):
         errors.append(
             "DPA4/PT2 production runs require Bohrium context_type and "
             "batch_type"
@@ -361,12 +362,19 @@ def _validate_dpa4_execution_config(
     effective_machine = _effective_dispatcher_machine(wf_config) or {}
     effective_context = str(effective_machine.get("context_type") or "").lower()
     effective_batch = str(effective_machine.get("batch_type") or "").lower()
-    if "bohrium" not in effective_context or "bohrium" not in effective_batch:
+    if openapi:
+        remote = effective_machine.get("remote_profile") or {}
+        if effective_context != "openapi" or effective_batch != "openapi":
+            errors.append("DPA4 effective dispatcher must retain OpenAPI")
+        for field, expected in (("machine_type", "c16_m120_1 * NVIDIA L20"), ("image_address", _dpa4_image_name()), ("platform", DPA4_PLATFORM), ("ignore_exit_code", False)):
+            if remote.get(field) != expected or getattr(wf_config, field) != expected:
+                errors.append(f"DPA4 OpenAPI {field} must equal {expected!r}")
+    elif "bohrium" not in effective_context or "bohrium" not in effective_batch:
         errors.append(
             "effective dispatcher machine_dict must retain Bohrium "
             "context_type and batch_type"
         )
-    if wf_config.scass_type != DPA4_SCASS_TYPE:
+    if not openapi and wf_config.scass_type != DPA4_SCASS_TYPE:
         errors.append(
             f"scass_type must equal {DPA4_SCASS_TYPE!r}; all other GPU/CPU "
             "SKUs are unverified"
@@ -382,7 +390,7 @@ def _validate_dpa4_execution_config(
             f"{DPA4_PLATFORM!r}"
         )
     effective_scass = _effective_bohrium_scass(wf_config)
-    if effective_scass != DPA4_SCASS_TYPE:
+    if not openapi and effective_scass != DPA4_SCASS_TYPE:
         errors.append(
             "effective machine.remote_profile.input_data.scass_type must "
             f"equal {DPA4_SCASS_TYPE!r}; nested machine overrides may not "
@@ -409,7 +417,9 @@ def _validate_dpa4_execution_config(
             "effective dispatcher command must remain the single-process "
             f"default {DPA4_DISPATCHER_COMMAND!r}"
         )
-    if dispatcher.get("remote_command") not in (None, ""):
+    if openapi and dispatcher.get("remote_command") != "/usr/local/bin/dpa4-python":
+        errors.append("DPA4 OpenAPI remote_command must use /usr/local/bin/dpa4-python")
+    if not openapi and dispatcher.get("remote_command") not in (None, ""):
         errors.append(
             "dispatcher remote_command is prohibited for DPA4 because it can "
             "bypass the audited one-rank wrapper"
@@ -1153,6 +1163,11 @@ def submit_workflow(
 
     # upload necessary python dependencies
     upload_python_packages = wf_config.basic_config_dict["upload_python_packages"]
+    # Calculator images need the serialization dependencies of RunLAMMPS.
+    import monty
+    import ruamel
+    upload_python_packages.extend(list(monty.__path__))
+    upload_python_packages.extend(list(ruamel.__path__))
     upload_python_packages.extend(list(apex.__path__))
     upload_python_packages.extend(list(fpop.__path__))
     upload_python_packages.extend(list(dpdata.__path__))

@@ -401,6 +401,9 @@ class Config:
             filtered_parameters = {
                 k: v for k, v in dispatcher_config.items() if k in defined_parameters
             }
+            if str(self.context_type).lower() == "openapi":
+                from apex.openapi_compat import dispatcher_pre_script
+                filtered_parameters["pre_script"] = dispatcher_pre_script() + "\n" + (filtered_parameters.get("pre_script") or "")
             executor = DispatcherExecutor(**filtered_parameters)
 
         return executor

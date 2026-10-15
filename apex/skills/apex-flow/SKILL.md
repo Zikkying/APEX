@@ -1,4 +1,20 @@
 ---
+
+## Qualified OpenAPI submission
+
+`--runtime-profile dpa4-alloytongqi-l20 --sandbox` is enabled for the pinned
+slim02 image and `machine_type: c16_m120_1 * NVIDIA L20`. The generator fixes
+`dispatcher_remote_command: /usr/local/bin/dpa4-python`; the dispatcher itself
+continues to use `python3`. APEX uploads the serialization dependencies and
+normalizes OpenAPI `jobId` for DPDispatcher result downloads. Use APEX 1.3.3
+or newer with these fixes; changing only global.json on an old client is insufficient.
+
+Verified workflow: `tongqi-openapi-acceptance-r5-relax-vwsb5` (108-atom FeCoNi
+static calculation, post-processing, automatic retrieval and local archive).
+This does not certify gamma convergence or the complete phonon/MD benchmark.
+The outer submission architecture is unchanged; `--sandbox` selects the inner
+OpenAPI backend, not an Agent-created outer sandbox.
+
 name: apex-flow
 description: Run APEX relaxation and 15-property materials workflows with VASP, ABACUS, or LAMMPS, including EOS, elastic, surface/defect, phonon/Grüneisen, parent-aware Gamma line/surface, finite-temperature lattice/elastic/annealing, two-phase melting-point brackets, previews, reporting, and RSS/high-entropy generation. Supports the validated general DPA4 phonoLAMMPS runtime and a bundled alloytongqi checkpoint with a separate fail-closed L20 profile. Use for APEX, alloy properties, melting/coexistence, stacking faults, random solid solutions, or multi-property DFT/MLIP screening.
 ---
@@ -79,9 +95,10 @@ Options to offer via AskQuestion:
     phonon/Grüneisen forced image; do not submit DPA4 through it.
   - For DPA4, use `--runtime-profile dpa4-alloytongqi-l20`. The generator
     uses the pinned published image from the profile. The maintainer has enabled
-    this release with `release_status: enabled_pending_e2e`; its
+    this release with `release_status: enabled`; its
     `qualification_status: pre_snapshot_only` remains truthful. Do not report
-    published-image or end-to-end acceptance as passed until receipts exist.
+    the full image benchmark as passed; the static OpenAPI acceptance receipt
+    is recorded separately in `openapi_qualification`.
     T4 is absent from the sandbox catalog checked on 2026-10-15; historical
     T4 results do not qualify L20. Never transplant a T4 `.pt2`.
     Once published, the generator must write
@@ -207,6 +224,11 @@ noise floor. Do not give completion-time estimates without throughput evidence.
   For Gamma properties, also read the representative-slab report: parent/final
   atom count, thickness, layer repeats, minimum distance, task count, and
   generated KPOINTS. Stop on any explicit limit violation.
+For the tongqi OpenAPI path, pass `--runtime-profile dpa4-alloytongqi-l20
+--sandbox` to `validate_apex_combo.py check`, with `--scass` set to the
+generated `machine_type` and `--image` to the pinned `image_address`. The
+legacy recommendation command describes job submission SKUs only.
+
 9. **Screen image × machine before submit.** Before writing `global.json` or submitting, run:
   ```bash
    python scripts/validate_apex_combo.py list-combos --backend lammps --prefer gpu
@@ -517,3 +539,5 @@ Successfully validated workflow (ID: `cu-fcc-elastic-v3-joint-sdfml`):
 | `reference/lammps_potentials.md` | LAMMPS potential type details and examples                                                                                                            |
 | `reference/rss_workflow.md`      | RSS structure generation workflow                                                                                                                     |
 | `reference/examples.md`          | Complete worked examples for common scenarios                                                                                                         |
+
+OpenAPI bootstrap: `ensure_apex.py` reuses APEX >= 1.3.3. Older runtimes install the immutable verified commit `7d867f4e8ef06e22708b0e151cc48571c4bf53a0` from Zikkying/APEX once; this source bootstrap does not depend on a PyPI release.

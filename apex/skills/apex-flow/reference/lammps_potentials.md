@@ -1,5 +1,21 @@
 # APEX LAMMPS Potential Types — Detailed Reference
 
+## Qualified OpenAPI submission
+
+`--runtime-profile dpa4-alloytongqi-l20 --sandbox` is enabled for the pinned
+slim02 image and `machine_type: c16_m120_1 * NVIDIA L20`. The generator fixes
+`dispatcher_remote_command: /usr/local/bin/dpa4-python`; the dispatcher itself
+continues to use `python3`. APEX uploads the serialization dependencies and
+normalizes OpenAPI `jobId` for DPDispatcher result downloads. Use APEX 1.3.3
+or newer with these fixes; changing only global.json on an old client is insufficient.
+
+Verified workflow: `tongqi-openapi-acceptance-r5-relax-vwsb5` (108-atom FeCoNi
+static calculation, post-processing, automatic retrieval and local archive).
+This does not certify gamma convergence or the complete phonon/MD benchmark.
+The outer submission architecture is unchanged; `--sandbox` selects the inner
+OpenAPI backend, not an Agent-created outer sandbox.
+
+
 ## Published alloytongqi L20 runtime
 
 For the bundled **DPA4-alloytongqi** checkpoint, select
@@ -7,7 +23,7 @@ For the bundled **DPA4-alloytongqi** checkpoint, select
 `registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02`
 at `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
 Use the profile's wrappers and model hashes. This release is enabled, with
-published-image and dflow end-to-end qualification still pending.
+full image benchmark pending; OpenAPI static make/run/post/retrieval acceptance passed.
 
 The `dpa4-phonolammps:0.0.2` references below describe the generic GPU/base
 image, not the bundled alloytongqi deployment. Do not switch a tongqi job to
@@ -19,7 +35,7 @@ The outer APEX client may use `c1_m2_cpu`. The inner tongqi calculator must
 retain `1 * NVIDIA L20_48g` for Bohrium job submission. Report both roles and
 verify the inner job receipt before claiming L20 execution. The sandbox SKU
 `c16_m120_1 * NVIDIA L20` is a separate backend identifier; do not put it in
-legacy job `scass_type`. OpenAPI qualification remains a separate gate.
+legacy job `scass_type`. OpenAPI is enabled for the exact L20 profile after static end-to-end acceptance.
 
 
 ## Overview

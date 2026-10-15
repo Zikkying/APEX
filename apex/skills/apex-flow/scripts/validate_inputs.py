@@ -190,12 +190,17 @@ def _validate_dpa4_global_contract(
 
     context_type = str(global_config.get("context_type") or "").lower()
     batch_type = str(global_config.get("batch_type") or "").lower()
-    if "bohrium" not in context_type or "bohrium" not in batch_type:
+    openapi = context_type == "openapi" and batch_type == "openapi"
+    if openapi:
+        for field, expected in (("machine_type", "c16_m120_1 * NVIDIA L20"), ("image_address", expected_image), ("ignore_exit_code", False)):
+            if global_config.get(field, False if field == "ignore_exit_code" else None) != expected:
+                errors.append(f"DPA4 OpenAPI {field} must equal {expected!r}")
+    if not openapi and ("bohrium" not in context_type or "bohrium" not in batch_type):
         errors.append(
             "DPA4/PT2 production validation requires Bohrium context_type "
             "and batch_type"
         )
-    if global_config.get("scass_type") != DPA4_SCASS_TYPE:
+    if not openapi and global_config.get("scass_type") != DPA4_SCASS_TYPE:
         errors.append(
             f"DPA4 scass_type must equal {DPA4_SCASS_TYPE!r}; other L20 SKUs, "
             "CPU, and non-L20 GPUs are unverified"
@@ -291,7 +296,9 @@ def _validate_dpa4_global_contract(
             "DPA4 effective dispatcher command must remain the single-process "
             f"default {DPA4_DISPATCHER_COMMAND!r}"
         )
-    if effective_remote_command not in (None, ""):
+    if openapi and effective_remote_command != "/usr/local/bin/dpa4-python":
+        errors.append("DPA4 OpenAPI remote_command must use /usr/local/bin/dpa4-python")
+    if not openapi and effective_remote_command not in (None, ""):
         errors.append(
             "DPA4 dispatcher remote_command is prohibited because it can "
             "bypass the audited one-rank wrapper"

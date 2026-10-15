@@ -2065,7 +2065,7 @@ class TestDpa4Profile(unittest.TestCase):
             profile["calculator"]["phonolammps_command"],
             self.profile_mod.DPA4_PHONOLAMMPS_RUN_COMMAND,
         )
-        self.assertTrue(profile["enabled_pending_e2e"])
+        self.assertFalse(profile["enabled_pending_e2e"])
         self.profile_mod.load_dpa4_profile(require_published=True)
         profile.pop("release_status")
         with self.assertRaisesRegex(RuntimeError, "not published"):

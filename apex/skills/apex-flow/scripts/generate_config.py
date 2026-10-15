@@ -732,7 +732,7 @@ def build_global_json_sandbox(backend: str, potential: str = None,
                               machine_type: str = None,
                               run_command: str = None,
                               vasp_image: str = None,
-                              lammps_image: str = None) -> dict:
+                              lammps_image: str = None, runtime_profile=None) -> dict:
     """
     Build global.json for APEX dflow submission via OpenAPI Sandbox.
 
@@ -740,6 +740,21 @@ def build_global_json_sandbox(backend: str, potential: str = None,
     Routes jobs through the Sandbox dflow host with the storeHost-patched
     dispatcher sidecar image.
     """
+    profile = _load_dpa4_runtime_profile(runtime_profile)
+    if profile:
+        if profile.get("openapi_qualification", {}).get("status") != "passed":
+            raise RuntimeError("DPA4 OpenAPI end-to-end qualification is pending")
+        if backend != "lammps" or potential not in (None, "deepmd"):
+            raise ValueError("DPA4 OpenAPI requires LAMMPS + DeePMD")
+        expected_machine = "c16_m120_1 * NVIDIA L20"
+        from dpa4_profile import dpa4_image_name
+        expected_image = dpa4_image_name(profile)
+        expected_command = profile["calculator"]["run_command"]
+        for value, expected in ((machine_type, expected_machine), (lammps_image, expected_image), (run_command, expected_command)):
+            if value is not None and value != expected:
+                raise ValueError("DPA4 OpenAPI machine, image and command must match the profile")
+        machine_type, lammps_image, run_command = expected_machine, expected_image, expected_command
+        potential = "deepmd"
     pid = resolve_project_id(project_id)
 
     # Resolve access key
@@ -829,6 +844,10 @@ def build_global_json_sandbox(backend: str, potential: str = None,
         if vasp_image:
             config["vasp_image_name"] = vasp_image.strip()
 
+    if profile:
+        config["phonolammps_run_command"] = profile["calculator"]["phonolammps_command"]
+        config["ignore_exit_code"] = False
+        config["dispatcher_remote_command"] = "/usr/local/bin/dpa4-python"
     return config
 
 
@@ -2076,7 +2095,7 @@ def main():
         try:
             runtime_profile = _load_dpa4_runtime_profile(args.runtime_profile)
             if runtime_profile.get("enabled_pending_e2e"):
-                print("NOTICE: tongqi release enabled; published-image and dflow E2E qualification pending.", file=sys.stderr)
+                print("NOTICE: tongqi release enabled; full published-image benchmark pending; see profile.openapi_qualification for E2E evidence.", file=sys.stderr)
         except (OSError, ValueError, RuntimeError) as exc:
             errors.append(str(exc))
         if args.backend != "lammps":
@@ -2099,9 +2118,9 @@ def main():
                 f"--runtime-profile {DPA4_RUNTIME_PROFILE} fixes the image; "
                 "do not pass --lammps-image"
             )
-        if getattr(args, "sandbox", False) or os.environ.get(
+        if (getattr(args, "sandbox", False) or os.environ.get(
             "BOHRIUM_USE_SANDBOX"
-        ) == "1":
+        ) == "1") and (runtime_profile or {}).get("openapi_qualification", {}).get("status") != "passed":
             errors.append(
                 f"--runtime-profile {DPA4_RUNTIME_PROFILE} is not qualified "
                 "for the OpenAPI Sandbox backend"
@@ -2170,6 +2189,7 @@ def main():
             run_command=args.run_command,
             vasp_image=args.vasp_image,
             lammps_image=args.lammps_image,
+            runtime_profile=runtime_profile,
         )
         print(f"Sandbox config built: machine_type={global_config['machine_type']}")
     else:
