@@ -539,3 +539,5 @@ Successfully validated workflow (ID: `cu-fcc-elastic-v3-joint-sdfml`):
 | `reference/lammps_potentials.md` | LAMMPS potential type details and examples                                                                                                            |
 | `reference/rss_workflow.md`      | RSS structure generation workflow                                                                                                                     |
 | `reference/examples.md`          | Complete worked examples for common scenarios                                                                                                         |
+
+OpenAPI bootstrap: `ensure_apex.py` reuses APEX >= 1.3.3. Older runtimes install the immutable verified commit `7d867f4e8ef06e22708b0e151cc48571c4bf53a0` from Zikkying/APEX once; this source bootstrap does not depend on a PyPI release.

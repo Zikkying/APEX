@@ -14,7 +14,7 @@ spec.loader.exec_module(bootstrap)
 
 class TestImageRuntimeBootstrap(unittest.TestCase):
     def test_usable_current_or_newer_image_does_not_install(self):
-        for version in ("1.3.2", "1.3.2.post1", "1.4.0"):
+        for version in ("1.3.3", "1.3.3.post1", "1.4.0"):
             with self.subTest(version=version), patch.object(
                 bootstrap.metadata, "version", return_value=version
             ), patch.object(bootstrap.subprocess, "run") as run:
@@ -25,7 +25,7 @@ class TestImageRuntimeBootstrap(unittest.TestCase):
                 self.assertTrue(all(cmd[0] == sys.executable for cmd in commands))
 
     def test_missing_old_or_prerelease_installs_only_pinned_release(self):
-        for version in (None, "1.3.1", "1.3.2rc1"):
+        for version in (None, "1.3.1", "1.3.2.post1", "1.3.3rc1"):
             with self.subTest(version=version), patch.object(
                 bootstrap.metadata, "version", return_value=version,
                 side_effect=bootstrap.metadata.PackageNotFoundError if version is None else None,
@@ -33,11 +33,12 @@ class TestImageRuntimeBootstrap(unittest.TestCase):
                 bootstrap.ensure_apex()
                 install = run.call_args_list[0].args[0]
                 self.assertEqual(install[:4], [sys.executable, "-m", "pip", "install"])
-                self.assertIn("apex-flow==1.3.2.post1", install)
+                self.assertIn(bootstrap.BOOTSTRAP_SOURCE, install)
+                self.assertRegex(bootstrap.BOOTSTRAP_SOURCE, r"/archive/[0-9a-f]{40}\.tar\.gz$")
                 self.assertNotIn("--upgrade", install)
 
     def test_broken_cli_fails_without_silent_reinstallation(self):
-        with patch.object(bootstrap.metadata, "version", return_value="1.3.2"), patch.object(
+        with patch.object(bootstrap.metadata, "version", return_value="1.3.3"), patch.object(
             bootstrap.subprocess, "run", side_effect=[
                 subprocess.CompletedProcess([], 0), subprocess.CalledProcessError(1, "apex")
             ]

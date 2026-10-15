@@ -7,8 +7,12 @@ import sys
 from importlib import metadata
 
 
-REQUIRED_VERSION = "1.3.2"
-BOOTSTRAP_VERSION = "1.3.2.post1"
+REQUIRED_VERSION = "1.3.3"
+# Immutable source includes the accepted OpenAPI runtime fixes.
+BOOTSTRAP_SOURCE = (
+    "https://github.com/Zikkying/APEX/archive/"
+    "7d867f4e8ef06e22708b0e151cc48571c4bf53a0.tar.gz"
+)
 
 
 def release_version(value):
@@ -25,12 +29,12 @@ def ensure_apex():
     version = release_version(installed) if installed else None
     if version is None or version < release_version(REQUIRED_VERSION):
         print(
-            f"APEX {installed or 'missing'}: installing apex-flow=={BOOTSTRAP_VERSION}",
+            f"APEX {installed or 'missing'}: installing verified APEX from {BOOTSTRAP_SOURCE}",
             flush=True,
         )
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "--no-cache-dir",
-             f"apex-flow=={BOOTSTRAP_VERSION}"],
+             BOOTSTRAP_SOURCE],
             check=True,
         )
     else:
