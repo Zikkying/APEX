@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-10-15",
+  "base_image_digest": "sha256:d5ce2f3a7b302a6f44faf97621e51b751fb9af53529ffc42687effb559992b3b",
+  "observed_compressed_historical_layers_gb": 49.41,
+  "user_stated_bohrium_limit_bytes": 40000000000,
+  "build_filesystem_limit_bytes": 35000000000,
+  "post_prune_cpu_sandbox_apparent_bytes_before_runtime_payload": 26901603302,
+  "runtime_payload_compressed_bytes": 144823387,
+  "runtime_payload_sha256": "c908437b8683180e7ee98a85a04f9457998017a943deef075b71d4910a39384c",
+  "major_original_directories_bytes": {
+    "/opt/mamba": 14293802245,
+    "/usr/local/cuda-12.8": 9374334666,
+    "/root/miniconda3": 7840467102,
+    "/root/apex_dpa4_cu_test": 4212425371
+  },
+  "status": "slim_build_pending_registry_and_gpu_acceptance",
+  "build_id": 178354,
+  "notes": [
+    "Directory sizes are nested and must not all be summed.",
+    "Bohrium lazy image filesystem requires du without -x to include mounted file content.",
+    "The CPU filesystem audit does not qualify GPU execution.",
+    "Prior snapshot failures returned empty logs; their exact cause remains unconfirmed."
+  ]
+}
