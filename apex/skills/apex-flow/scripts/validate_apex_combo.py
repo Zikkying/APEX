@@ -128,6 +128,7 @@ def check_combo(
     runtime_profile: str = None,
     mpi_ranks: int = 1,
     gpu_count: int = 1,
+    sandbox: bool = False,
 ) -> tuple[bool, list[str]]:
     """
     Return (ok, messages). ok=False means do not submit.
@@ -153,6 +154,10 @@ def check_combo(
         expected_image = dpa4_image_name(profile)
         combo = dpa4_recommended_combo(profile)
         expected_scass = combo["scass_type"]
+        if sandbox:
+            if profile.get("openapi_qualification", {}).get("status") != "passed":
+                return False, ["DPA4 OpenAPI qualification is pending"]
+            expected_scass = "c16_m120_1 * NVIDIA L20"
         if (image or "").strip() != expected_image:
             errors.append(
                 "DPA4 profile requires the exact qualified image "
@@ -397,6 +402,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         runtime_profile=args.runtime_profile,
         mpi_ranks=args.mpi_ranks,
         gpu_count=args.gpu_count,
+        sandbox=getattr(args, "sandbox", False),
     )
     payload = {"ok": ok, "image": full_image(args.image), "scass_type": args.scass, "errors": errors}
     if args.format == "json":
@@ -444,6 +450,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_check.add_argument("--runtime-profile", choices=[DPA4_RUNTIME_PROFILE])
     p_check.add_argument("--mpi-ranks", type=int, default=1)
     p_check.add_argument("--gpu-count", type=int, default=1)
+    p_check.add_argument("--sandbox", action="store_true", help="Validate OpenAPI machine_type instead of legacy job scass_type")
     p_check.set_defaults(func=cmd_check)
 
     p_rec = sub.add_parser("recommend", help="Print a safe default combo")

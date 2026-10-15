@@ -83,9 +83,9 @@ def validate_dpa4_profile(
     )
     qualification_status = str(profile.get("qualification_status", "")).strip()
     qualified = qualification_status == "post_snapshot_passed"
-    enabled = profile.get("release_status") == "enabled_pending_e2e"
+    enabled = profile.get("release_status") in ("enabled", "enabled_pending_e2e")
     published = identity_finalized and (qualified or enabled)
-    profile["enabled_pending_e2e"] = enabled and not qualified
+    profile["enabled_pending_e2e"] = enabled and not qualified and profile.get("openapi_qualification", {}).get("status") != "passed"
     profile["identity_finalized"] = identity_finalized
     profile["qualified"] = qualified
     profile["published"] = published
