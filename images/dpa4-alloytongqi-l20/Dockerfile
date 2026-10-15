@@ -22,6 +22,10 @@ RUN mkdir -p /tmp/preserved-conda-libs \
     && echo "Final runtime filesystem bytes: $bytes (limit 35000000000)" \
     && test "$bytes" -lt 35000000000
 RUN /opt/mamba/bin/python -c 'import hashlib,importlib.metadata,json,pathlib; m=json.loads(pathlib.Path("/opt/dpa4-runtime/build-manifest.json").read_text()); assert all(pathlib.Path(f["path"]).stat().st_size == f["bytes"] and hashlib.sha256(pathlib.Path(f["path"]).read_bytes()).hexdigest() == f["sha256"] for f in m["files"]); assert all(importlib.metadata.version(k)==v for k,v in m["packages"].items()); print("Runtime file hashes and package versions verified")'
+# Install workflow serialization dependencies in the scientific environment,
+# never in the system Python. Run before flattening; calculator jobs install nothing.
+RUN /opt/mamba/bin/python -m pip install --no-cache-dir 'monty==2025.3.3' 'ruamel.yaml==0.18.10' \
+    && /usr/local/bin/dpa4-python -c 'import numpy, monty, ruamel.yaml; print("APEX calculation dependencies verified")'
 FROM scratch
 COPY --from=assembled / /
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/mamba/bin \
