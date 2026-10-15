@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://apex-flow.local/schemas/dpa4-alloytongqi-benchmark-v2.json",
+  "$id": "https://apex-flow.local/schemas/dpa4-alloytongqi-benchmark-v3.json",
   "title": "DPA4 alloytongqi small-cell GPU compatibility manifest",
   "type": "object",
   "additionalProperties": false,
@@ -24,8 +24,8 @@
   ],
   "properties": {
     "$schema": {"type": "string"},
-    "schema_version": {"const": "2.0.0"},
-    "benchmark_id": {"const": "dpa4-alloytongqi-small-cell-gpu-compat-v2"},
+    "schema_version": {"const": "3.0.0"},
+    "benchmark_id": {"const": "dpa4-alloytongqi-small-cell-l20-compat-v3"},
     "created_at": {"type": ["string", "null"]},
     "status": {"$ref": "#/$defs/status"},
     "reason_codes": {
@@ -256,6 +256,7 @@
           "type": "object",
           "additionalProperties": {"type": ["string", "null"]}
         },
+        "lammps_builtin": {"type": ["object", "null"]},
         "lammps_plugins": {
           "type": "array",
           "items": {"$ref": "#/$defs/file"}

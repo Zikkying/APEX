@@ -23,10 +23,11 @@ from benchmark_lib import (
     identity_reasons,
     missing_package_reasons,
     resolve_lammps_plugin_path,
+    probe_builtin_lammps,
     run_monitored,
     runtime_model_identity,
     single_rank_command_reasons,
-    t4_environment_reasons,
+    l20_environment_reasons,
     utc_now,
     write_json_new,
 )
@@ -69,12 +70,15 @@ def validate_force_constants(path: Path, expected_atoms: int) -> dict[str, Any]:
     if not lines:
         raise ValueError("FORCE_CONSTANTS is empty")
     header = lines[0].split()
-    if len(header) != 1:
-        raise ValueError("FORCE_CONSTANTS header must contain exactly one atom count")
+    if len(header) not in (1, 2):
+        raise ValueError("FORCE_CONSTANTS header must contain one or two atom counts")
     try:
-        atom_count = int(header[0])
+        counts = [int(value) for value in header]
     except ValueError as exc:
         raise ValueError("FORCE_CONSTANTS atom count is not an integer") from exc
+    atom_count = counts[0]
+    if len(counts) == 2 and counts[1] != atom_count:
+        raise ValueError("compact FORCE_CONSTANTS is not a full square matrix")
     if atom_count <= 0:
         raise ValueError("FORCE_CONSTANTS atom count must be positive")
     if atom_count != expected_atoms:
@@ -236,7 +240,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if runtime_model.suffix.lower() != ".pt2":
         raise ValueError("--runtime-model must be a GPU-specific .pt2 file")
     if args.device != "gpu":
-        raise ValueError("this qualification smoke is T4 GPU-only")
+        raise ValueError("this qualification smoke is L20 GPU-only")
     input_path, copied_model = _prepare(case_dir, runtime_model, args.output)
     base_command = _command(args.command_json)
     command = [
@@ -256,9 +260,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     child_env["CUDA_VISIBLE_DEVICES"] = (
         "" if args.device == "cpu" else args.gpu_index
     )
-    plugin_path, plugins, plugin_issues = resolve_lammps_plugin_path(
-        args.lammps_plugin_path, os.environ.get("LAMMPS_PLUGIN_PATH")
-    )
+    builtin = None
+    if args.lammps_builtin_binary and args.lammps_builtin_library:
+        builtin, plugin_issues = probe_builtin_lammps(
+            args.lammps_builtin_binary, args.lammps_builtin_library
+        )
+        plugin_path, plugins = None, []
+    else:
+        plugin_path, plugins, plugin_issues = resolve_lammps_plugin_path(
+            args.lammps_plugin_path, os.environ.get("LAMMPS_PLUGIN_PATH")
+        )
     if plugin_path:
         child_env["LAMMPS_PLUGIN_PATH"] = plugin_path
     identity, identity_issues = identity_reasons(
@@ -282,11 +293,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
     }
     environment["lammps_plugins"] = plugins
+    environment["lammps_builtin"] = builtin
     setup_failures = single_rank_command_reasons(
         base_command, {"phonolammps", "dpa4-phonolammps"}
     )
     setup_failures.extend(plugin_issues)
-    setup_failures.extend(t4_environment_reasons(environment, args.gpu_index))
+    setup_failures.extend(l20_environment_reasons(environment, args.gpu_index))
 
     started_at = utc_now()
     start = time.monotonic()
@@ -482,7 +494,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--runtime-model",
         required=True,
         type=Path,
-        help="T4 GPU-specific DeepMD AOTI artifact; must end in .pt2",
+        help="L20 GPU-specific DeepMD AOTI artifact; must end in .pt2",
     )
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--image-ref", required=True)
@@ -505,6 +517,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--command-json", default='["phonolammps"]')
     parser.add_argument("--timeout", type=float, default=600.0)
+    parser.add_argument("--lammps-builtin-binary")
+    parser.add_argument("--lammps-builtin-library")
     args = parser.parse_args(argv)
     if any(value <= 0 for value in args.dim):
         parser.error("all --dim values must be positive")

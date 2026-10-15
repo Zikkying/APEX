@@ -339,12 +339,29 @@ class TestGenerateConfigHelpers(unittest.TestCase):
                 )
         ticket.assert_not_called()
 
+    def test_zero_digest_dpa4_profile_fails_before_ticket(self):
+        profile = json.loads(
+            (get_skill_root() / "data" / "dpa4_alloytongqi_l20_profile.json").read_text()
+        )
+        profile["qualification_status"] = "post_snapshot_passed"
+        profile["image"] = {
+            "ref": "registry.example/dpa4:forged",
+            "digest": "sha256:" + "0" * 64,
+        }
+        with patch.object(self.gen, "get_bohrium_ticket") as ticket:
+            with self.assertRaisesRegex(RuntimeError, "not published"):
+                self.gen.build_global_json(
+                    "lammps", "deepmd", access_key="key", project_id=42,
+                    runtime_profile=profile,
+                )
+        ticket.assert_not_called()
+
     def test_published_dpa4_profile_builds_exact_contract(self):
         profile = json.loads(
             (
                 get_skill_root()
                 / "data"
-                / "dpa4_alloytongqi_t4_profile.json"
+                / "dpa4_alloytongqi_l20_profile.json"
             ).read_text(encoding="utf-8")
         )
         profile["qualification_status"] = "post_snapshot_passed"
@@ -367,7 +384,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             "registry.example/dpa4:qualified@sha256:" + "a" * 64,
         )
         self.assertEqual(
-            global_config["scass_type"], "c4_m15_1 * NVIDIA T4"
+            global_config["scass_type"], "1 * NVIDIA L20_48g"
         )
         self.assertEqual(
             global_config["lammps_run_command"],
@@ -380,7 +397,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
         )
         validate.assert_called_once_with(
             global_config["lammps_image_name"],
-            "c4_m15_1 * NVIDIA T4",
+            "1 * NVIDIA L20_48g",
             runtime_profile=self.gen.DPA4_RUNTIME_PROFILE,
         )
 
@@ -393,10 +410,10 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             "model_in_image": True,
             "model": (
                 "/opt/dpa4-runtime/models/DPA4-alloytongqi/"
-                "alloytongqi.t4-sm75.pt2"
+                "alloytongqi.l20-sm89.pt2"
             ),
             "runtime_model_sha256": (
-                "2614db9463f5864d80a78fec037aeae26930df2004bb9f1148a69b83c25b3daf"
+                "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369"
             ),
             "source_checkpoint": (
                 "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt"
@@ -723,7 +740,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
                 "create",
                 "--structure", str(structure),
                 "--backend", "lammps",
-                "--runtime-profile", "dpa4-alloytongqi-t4",
+                "--runtime-profile", "dpa4-alloytongqi-l20",
                 "--properties", "elastic",
                 "--project-id", "7",
                 "--access-key", "key",
@@ -2036,7 +2053,7 @@ class TestDpa4Profile(unittest.TestCase):
             profile["machine_compatibility"]["recommended"][0][
                 "scass_type"
             ],
-            "c4_m15_1 * NVIDIA T4",
+            "1 * NVIDIA L20_48g",
         )
         self.assertEqual(
             profile["calculator"]["run_command"],
@@ -2159,10 +2176,10 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
         self.assertIsNone(data["recommended"])
         self.assertEqual(
             data["candidate_after_publish"]["scass_type"],
-            "c4_m15_1 * NVIDIA T4",
+            "1 * NVIDIA L20_48g",
         )
         self.assertTrue(any(
-            "c8_m31_1" in item for item in data["unverified"]
+            "RTX 4090" in item for item in data["unverified"]
         ))
         with self.assertRaisesRegex(RuntimeError, "not published"):
             self.combo.recommend(
@@ -2171,7 +2188,7 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
 
         ok, errors = self.combo.check_combo(
             "registry.example/dpa4:tag@sha256:" + "a" * 64,
-            "c4_m15_1 * NVIDIA T4",
+            "1 * NVIDIA L20_48g",
             runtime_profile=self.combo.DPA4_RUNTIME_PROFILE,
         )
         self.assertFalse(ok)
@@ -2197,7 +2214,7 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
             },
             "machine_compatibility": {
                 "recommended": [{
-                    "scass_type": "c4_m15_1 * NVIDIA T4",
+                    "scass_type": "1 * NVIDIA L20_48g",
                     "mpi_ranks": 1,
                     "gpu_count": 1,
                 }],
@@ -2208,7 +2225,7 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
         with patch.object(self.combo, "_dpa4_profile", return_value=profile):
             ok, errors = self.combo.check_combo(
                 exact,
-                "c4_m15_1 * NVIDIA T4",
+                "1 * NVIDIA L20_48g",
                 runtime_profile=self.combo.DPA4_RUNTIME_PROFILE,
             )
             self.assertTrue(ok)

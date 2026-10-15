@@ -23,10 +23,11 @@ from benchmark_lib import (
     identity_reasons,
     missing_package_reasons,
     resolve_lammps_plugin_path,
+    probe_builtin_lammps,
     run_monitored,
     runtime_model_identity,
     single_rank_command_reasons,
-    t4_environment_reasons_for_device,
+    l20_environment_reasons_for_device,
     utc_now,
     write_json_new,
 )
@@ -217,9 +218,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         child_env["CUDA_VISIBLE_DEVICES"] = ""
     else:
         child_env["CUDA_VISIBLE_DEVICES"] = args.gpu_index
-    plugin_path, plugins, plugin_issues = resolve_lammps_plugin_path(
-        args.lammps_plugin_path, os.environ.get("LAMMPS_PLUGIN_PATH")
-    )
+    builtin = None
+    if args.lammps_builtin_binary and args.lammps_builtin_library:
+        builtin, plugin_issues = probe_builtin_lammps(
+            args.lammps_builtin_binary, args.lammps_builtin_library
+        )
+        plugin_path, plugins = None, []
+    else:
+        plugin_path, plugins, plugin_issues = resolve_lammps_plugin_path(
+            args.lammps_plugin_path, os.environ.get("LAMMPS_PLUGIN_PATH")
+        )
     if plugin_path:
         child_env["LAMMPS_PLUGIN_PATH"] = plugin_path
 
@@ -243,12 +251,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
     }
     environment["lammps_plugins"] = plugins
+    environment["lammps_builtin"] = builtin
     setup_failures = single_rank_command_reasons(
         base_command, {"lmp", "lmp_mpi", "lmp_serial", "lammps", "dpa4-lmp"}
     )
     setup_failures.extend(plugin_issues)
     setup_failures.extend(
-        t4_environment_reasons_for_device(
+        l20_environment_reasons_for_device(
             environment, args.gpu_index, args.device
         )
     )
@@ -453,6 +462,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--timeout", type=float, default=300.0)
+    parser.add_argument("--lammps-builtin-binary")
+    parser.add_argument("--lammps-builtin-library")
     args = parser.parse_args(argv)
     record = run(args)
     print(f"{record['case']} {record['device']} {record['mode']}: {record['status']}")

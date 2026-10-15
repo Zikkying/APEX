@@ -44,10 +44,10 @@ GPU_LAMMPS_INTERACTIONS = {"deepmd", "mace", "nep"}
 DPA4_RUNTIME_KIND = "dpa4_pt2"
 DPA4_RUNTIME_MODEL_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/"
-    "alloytongqi.t4-sm75.pt2"
+    "alloytongqi.l20-sm89.pt2"
 )
 DPA4_RUNTIME_MODEL_SHA256 = (
-    "2614db9463f5864d80a78fec037aeae26930df2004bb9f1148a69b83c25b3daf"
+    "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369"
 )
 DPA4_SOURCE_CHECKPOINT_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt"
@@ -55,7 +55,7 @@ DPA4_SOURCE_CHECKPOINT_PATH = (
 DPA4_SOURCE_CHECKPOINT_SHA256 = (
     "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad"
 )
-DPA4_SCASS_TYPE = "c4_m15_1 * NVIDIA T4"
+DPA4_SCASS_TYPE = "1 * NVIDIA L20_48g"
 DPA4_LAMMPS_RUN_COMMAND = "/usr/local/bin/dpa4-lmp -in in.lammps"
 DPA4_PHONOLAMMPS_RUN_COMMAND = (
     "/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} "
@@ -170,7 +170,7 @@ def _validate_exact_dpa4_interaction(label: str, interaction: dict) -> list[str]
         if interaction.get(key) != value:
             errors.append(
                 f"{label}.{key} must equal {value!r} for the bundled DPA4 "
-                "T4/PT2 production runtime"
+                "L20/PT2 production runtime"
             )
     type_map = interaction.get("type_map")
     if type_map != "auto":
@@ -246,7 +246,7 @@ def _validate_lammps_runtime_contract(
             errors.append(
                 f"{label}.model is the bundled DPA4 source checkpoint in "
                 f"{checkpoint_locations}; LAMMPS must receive the image-resident "
-                f"T4 .pt2 runtime at {DPA4_RUNTIME_MODEL_PATH!r}, never model.pt"
+                f"L20 .pt2 runtime at {DPA4_RUNTIME_MODEL_PATH!r}, never model.pt"
             )
             classifications.append(DPA4_RUNTIME_KIND)
             continue
@@ -256,7 +256,7 @@ def _validate_lammps_runtime_contract(
         )
         if staged_runtime_locations:
             errors.append(
-                f"{label}.model resolves to the bundled DPA4 T4 .pt2 in "
+                f"{label}.model resolves to the bundled DPA4 L20 .pt2 in "
                 f"{staged_runtime_locations}, but the production contract "
                 f"requires the image-resident path {DPA4_RUNTIME_MODEL_PATH!r} "
                 "with model_in_image=true"
@@ -431,7 +431,7 @@ def _validate_dpa4_execution_config(
         )
     if basic.get("group_size") != DPA4_GROUP_SIZE:
         errors.append(
-            f"group_size must equal {DPA4_GROUP_SIZE} for one task per T4"
+            f"group_size must equal {DPA4_GROUP_SIZE} for one task per L20"
         )
     if basic.get("pool_size") != DPA4_POOL_SIZE:
         errors.append(

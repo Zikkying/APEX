@@ -41,12 +41,12 @@ class TestApexSkill(unittest.TestCase):
         self.assertIn("--gif-view", text)
         root = get_skill_root()
         self.assertTrue((root / "models" / "README.md").is_file())
-        profile = root / "data" / "dpa4_alloytongqi_t4_profile.json"
+        profile = root / "data" / "dpa4_alloytongqi_l20_profile.json"
         self.assertTrue(profile.is_file())
         profile_text = profile.read_text(encoding="utf-8")
-        self.assertIn("__DPA4_IMAGE_REF__", profile_text)
+        self.assertIn("dpa4-alloytongqi-l20", profile_text)
         self.assertIn("pre_snapshot_only", profile_text)
-        self.assertIn("c4_m15_1 * NVIDIA T4", profile_text)
+        self.assertIn("1 * NVIDIA L20_48g", profile_text)
         self.assertNotIn("4c-nano", profile_text)
         benchmark = root / "benchmarks" / "dpa4-alloytongqi"
         for name in (
@@ -134,7 +134,7 @@ class TestApexSkill(unittest.TestCase):
             self.assertFalse(any("global_local_" in n for n in names))
             self.assertFalse(any("global_bohrium_direct.json" in n for n in names))
             self.assertIn(
-                f"{SKILL_NAME}/data/dpa4_alloytongqi_t4_profile.json", names
+                f"{SKILL_NAME}/data/dpa4_alloytongqi_l20_profile.json", names
             )
             self.assertIn(
                 f"{SKILL_NAME}/scripts/dpa4_profile.py", names

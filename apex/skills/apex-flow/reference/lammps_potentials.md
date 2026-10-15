@@ -222,7 +222,7 @@ manual map.
 | deepmd | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
 | mace | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
 | nep | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
-| DPA4 alloytongqi candidate | Locked `dpa4-alloytongqi-t4` profile; no published image yet | One T4 only after exact-image qualification |
+| DPA4 alloytongqi candidate | Locked `dpa4-alloytongqi-l20` profile; no published image yet | One L20 only after exact-image qualification |
 | gap | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No (CPU) |
 | snap | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
 | rann | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
@@ -240,13 +240,12 @@ Bohrium registry mirror at repo digest
 `sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`
 rejects the bundled DPA4 `model.pt` with `Unknown model type: dpa4`. Do not
 submit that model under the default image or silently choose another image.
-The DPA4 profile fails closed while image placeholders or
-`pre_snapshot_only` status remain. The only pre-snapshot candidate hardware is
-one rank/one GPU on `c4_m15_1 * NVIDIA T4`; c8/c16 T4, non-T4 GPUs, CPU,
-multi-rank, multi-GPU, and cross-architecture PT2 reuse are not recommended.
-V100/SM 7.0 and older devices and NVIDIA Linux drivers below 580.65.06 are
-prohibited by the CUDA 13 runtime. A published profile must use absolute
-`/usr/local/bin/dpa4-lmp` and `/usr/local/bin/dpa4-phonolammps` wrappers.
+The DPA4 profile fails closed without exact-image `post_snapshot_passed`
+evidence. It targets one L20 SM 8.9 and one MPI rank; use job SKU
+`1 * NVIDIA L20_48g`. The sandbox catalog uses a different name:
+`c16_m120_1 * NVIDIA L20`. T4 is no longer listed there. CPU production,
+other GPU families, multi-rank and multi-GPU are not qualified. Use the
+absolute `/usr/local/bin/dpa4-lmp` and `/usr/local/bin/dpa4-phonolammps` wrappers.
 Other potential types also require their own compatible model files.
 
 ---

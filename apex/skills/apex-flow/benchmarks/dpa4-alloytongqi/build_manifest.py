@@ -246,6 +246,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                         "selected_environment", {}
                     ),
                     "lammps_plugins": environment.get("lammps_plugins", []),
+                    "lammps_builtin": environment.get("lammps_builtin"),
                 },
             )
     runtime_models = []
@@ -346,7 +347,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_hashes": artifacts,
         "notes": [
             "The checkpoint .pt is identity/probe input only; LAMMPS receives a device-specific .pt2 runtime artifact.",
-            "CPU and T4 GPU runtime .pt2 hashes must be distinct and internally consistent across all cases.",
+            "CPU and L20 GPU runtime .pt2 hashes must be distinct and internally consistent across all cases.",
             "phonoLAMMPS evidence must include all finite N^2 FORCE_CONSTANTS blocks for the requested supercell.",
             "Only status=passed is positive image/model/GPU compatibility evidence.",
         ],

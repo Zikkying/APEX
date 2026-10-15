@@ -139,14 +139,14 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 > rejects the bundled DPA4 model with `Unknown model type: dpa4`; do not submit
 > that model under the old image or silently route it to another image.
 
-The DPA4 exception is explicit and currently locked. Inspect it with
+Select the dedicated DPA4 runtime explicitly. Inspect its current qualification with
 `validate_apex_combo.py list-combos --runtime-profile
-dpa4-alloytongqi-t4`. Do not use `recommend` or `generate_config.py create
+dpa4-alloytongqi-l20`. Do not use `recommend` or `generate_config.py create
 --runtime-profile ...` until an immutable image ref/digest has passed the
 packaged benchmark and the profile says `post_snapshot_passed`.
-Pre-snapshot evidence exists only for one rank/one GPU on
-`c4_m15_1 * NVIDIA T4`; it is not a published-image recommendation. Generic
-APEX and legacy phonon/Grüneisen continue to use the old image above.
+The target is one L20 SM 8.9 and one MPI rank. Jobs use
+`1 * NVIDIA L20_48g`; `c16_m120_1 * NVIDIA L20` is a sandbox SKU and is invalid
+in this job context. Historical T4 checks do not qualify the L20 artifact.
 When published, `generate_config.py` writes both
 `lammps_run_command=/usr/local/bin/dpa4-lmp -in in.lammps` and the complete
 `phonolammps_run_command=/usr/local/bin/dpa4-phonolammps {input_file} -c

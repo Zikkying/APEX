@@ -49,15 +49,15 @@ BUNDLED_DPA4_SHA256 = (
 DPA4_RUNTIME_KIND = "dpa4_pt2"
 DPA4_RUNTIME_MODEL_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/"
-    "alloytongqi.t4-sm75.pt2"
+    "alloytongqi.l20-sm89.pt2"
 )
 DPA4_RUNTIME_MODEL_SHA256 = (
-    "2614db9463f5864d80a78fec037aeae26930df2004bb9f1148a69b83c25b3daf"
+    "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369"
 )
 DPA4_SOURCE_CHECKPOINT_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt"
 )
-DPA4_SCASS_TYPE = "c4_m15_1 * NVIDIA T4"
+DPA4_SCASS_TYPE = "1 * NVIDIA L20_48g"
 DPA4_LAMMPS_RUN_COMMAND = "/usr/local/bin/dpa4-lmp -in in.lammps"
 DPA4_PHONOLAMMPS_RUN_COMMAND = (
     "/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} "
@@ -175,7 +175,7 @@ def _validate_dpa4_global_contract(
     """Validate image, hardware, grouping, and audited entry points."""
     if not isinstance(global_config, dict):
         return [
-            "DPA4/PT2 requires global.json so the exact image, T4 SKU, and "
+            "DPA4/PT2 requires global.json so the exact image, L20 SKU, and "
             "single-rank wrappers can be verified"
         ]
 
@@ -197,8 +197,8 @@ def _validate_dpa4_global_contract(
         )
     if global_config.get("scass_type") != DPA4_SCASS_TYPE:
         errors.append(
-            f"DPA4 scass_type must equal {DPA4_SCASS_TYPE!r}; other T4 SKUs, "
-            "CPU, and non-T4 GPUs are unverified"
+            f"DPA4 scass_type must equal {DPA4_SCASS_TYPE!r}; other L20 SKUs, "
+            "CPU, and non-L20 GPUs are unverified"
         )
     if global_config.get("job_type", DPA4_JOB_TYPE) != DPA4_JOB_TYPE:
         errors.append(
@@ -226,7 +226,7 @@ def _validate_dpa4_global_contract(
         if nested_scass is not None and nested_scass != DPA4_SCASS_TYPE:
             errors.append(
                 "machine.remote_profile.input_data.scass_type may not "
-                "override the qualified DPA4 T4 SKU"
+                "override the qualified DPA4 L20 SKU"
             )
         for key in ("context_type", "batch_type"):
             value = machine.get(key)
@@ -314,7 +314,7 @@ def _validate_dpa4_global_contract(
         global_config.get("group_size") != DPA4_GROUP_SIZE
     ):
         errors.append(
-            f"DPA4 group_size must equal {DPA4_GROUP_SIZE} for one task per T4"
+            f"DPA4 group_size must equal {DPA4_GROUP_SIZE} for one task per L20"
         )
     if type(global_config.get("pool_size")) is not int or (
         global_config.get("pool_size") != DPA4_POOL_SIZE
@@ -1159,7 +1159,7 @@ def validate_bundled_dpa4_runtime(
     global_config: dict | None,
     base_dir: Path,
 ) -> tuple[list[str], list[str]]:
-    """Require the exact image-resident, T4-only DPA4 production contract."""
+    """Require the exact image-resident, L20-only DPA4 production contract."""
     interactions = list(_iter_effective_interactions(param_config))
     if not interactions:
         return [], []
@@ -1213,7 +1213,7 @@ def validate_bundled_dpa4_runtime(
             if interaction.get(key) != expected:
                 errors.append(
                     f"{label}.{key} must equal {expected!r} for the bundled "
-                    "DPA4 T4/PT2 runtime"
+                    "DPA4 L20/PT2 runtime"
                 )
         type_map = interaction.get("type_map")
         valid_type_map = type_map == "auto" or (

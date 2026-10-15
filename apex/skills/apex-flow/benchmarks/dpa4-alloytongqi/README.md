@@ -5,10 +5,10 @@ bundled training checkpoint:
 
 - model: `../../models/DPA4-alloytongqi/model.pt`
 - SHA-256: `c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad`
-- benchmark ID: `dpa4-alloytongqi-small-cell-gpu-compat-v2`
+- benchmark ID: `dpa4-alloytongqi-small-cell-l20-compat-v3`
 
 The `.pt` checkpoint is **never** passed to LAMMPS. The current DPA4 LAMMPS
-backend accepts a device-specific AOTI `.pt2` runtime artifact; CPU and T4 GPU
+backend accepts a device-specific AOTI `.pt2` runtime artifact; CPU and L20 GPU
 legs therefore require independently frozen `.pt2` files with distinct hashes.
 
 It tests checkpoint inspection, the DeepMD LAMMPS plugin, short LAMMPS `run 0` and NVE
@@ -20,6 +20,9 @@ itself prove a complete dflow/Bohrium APEX workflow.
 `passed`; create a new evidence workspace and let `build_manifest.py` derive the
 status from files produced by actual execution.
 
+Version 3 targets L20 (compute capability 8.9). Historical T4 v2 results do not
+qualify this target; rerun every leg on the exact published L20 image.
+
 ## Evidence states
 
 - `untested`: no runtime command has produced evidence.
@@ -28,9 +31,9 @@ status from files produced by actual execution.
 - `failed`: an executed command failed, emitted a fatal signature, produced no
   parseable finite observables or complete finite `FORCE_CONSTANTS`, or exceeded
   a parity gate.
-- `passed`: all 12 LAMMPS runs, all six CPU–GPU comparisons, and the Ti T4 GPU
+- `passed`: all 12 LAMMPS runs, all six CPU–GPU comparisons, and the Ti L20 GPU
   phonoLAMMPS smoke passed with a full image digest, one consistent CPU `.pt2`,
-  one consistent T4 `.pt2`, distinct runtime hashes, and complete evidence.
+  one consistent L20 `.pt2`, distinct runtime hashes, and complete evidence.
 
 Only `passed` is positive compatibility evidence. Never promote an
 `inconclusive` run based on a successful shell exit alone.
@@ -54,11 +57,13 @@ after `atom_style atomic` and before `read_data`. This is required by the
 single-rank periodic DPA4 graph path; removing or moving it invalidates the
 benchmark.
 
-The generated inputs deliberately contain no `plugin load` command. The exact
-b95 `BUILD_PY_IF=ON` build installs `libdeepmd_lmpplugin.so`; the candidate
-image must expose its containing directory through `LAMMPS_PLUGIN_PATH` so
-LAMMPS auto-loads it. The runner rejects a missing/invalid path or a path that
-does not contain that exact plugin filename.
+The generated inputs contain no `plugin load` command. Dynamic builds must
+expose `libdeepmd_lmpplugin.so` through `LAMMPS_PLUGIN_PATH`. Native builds use
+`--lammps-builtin-binary /opt/lammps-sm89/bin/lmp` and
+`--lammps-builtin-library /opt/lammps-sm89/lib/liblammps.so.0` instead of
+`--lammps-plugin-path`. The runner hashes both files, checks the `deepmd` style,
+and verifies that the binary links that exact shared library. phonoLAMMPS must
+load the same native library through its audited wrapper.
 
 ## Required runtime
 
@@ -66,8 +71,7 @@ Run these scripts **inside the candidate image**, using that image's Python and
 executables. The image must provide:
 
 - DeepMD-kit with DPA4 support;
-- LAMMPS plus `libdeepmd_lmpplugin.so` discoverable through
-  `LAMMPS_PLUGIN_PATH` auto-loading;
+- LAMMPS with native DeepMD support, or an auto-loaded DeepMD plugin;
 - `phonolammps`, `phonopy`, Python `lammps`, `dpdata`, PyTorch, and NumPy;
 - `nvidia-smi` on GPU runs.
 
@@ -75,12 +79,12 @@ The scripts never install packages. They record package metadata for
 `deepmd-kit`, `phonolammps`, `phonopy`, `lammps`, `dpdata`, `torch`, and
 `numpy`; a missing version keeps the result non-passing.
 
-This v2 qualification is intentionally limited to one selected NVIDIA T4
-(compute capability 7.5) and one LAMMPS rank with deterministic thread settings (`OMP_NUM_THREADS=1`, DeepMD
-intra/inter-op threads = 1). The runners reject a non-T4 selected GPU and an MPI
+This v3 qualification is intentionally limited to one selected NVIDIA L20
+(compute capability 8.9) and one LAMMPS rank with deterministic thread settings (`OMP_NUM_THREADS=1`, DeepMD
+intra/inter-op threads = 1). The runners reject a non-L20 selected GPU and an MPI
 launcher that does not explicitly request exactly one rank. CPU and GPU parity
 must use the same exact image digest and checkpoint hash but different
-device-specific `.pt2` hashes. Run the CPU leg on the same T4 node/image; the
+device-specific `.pt2` hashes. Run the CPU leg on the same L20 node/image; the
 script hides GPUs with an empty `CUDA_VISIBLE_DEVICES` and fails if its process
 is nevertheless observed on a GPU.
 
@@ -94,7 +98,7 @@ BENCH_ROOT="$PWD"
 WORKSPACE="$BENCH_ROOT/workspace"
 CHECKPOINT="$BENCH_ROOT/../../models/DPA4-alloytongqi/model.pt"
 CPU_PT2="/absolute/path/from-cpu-freeze/model.cpu.pt2"
-GPU_PT2="/absolute/path/from-this-t4-freeze/model.t4.pt2"
+GPU_PT2="/absolute/path/from-this-l20-freeze/model.l20.pt2"
 PLUGIN_DIR="/absolute/path/containing/libdeepmd_lmpplugin.so"
 IMAGE_REF="registry.example.invalid/owner/dpa4-apex:replace-me"
 IMAGE_DIGEST="sha256:replace-with-64-lowercase-hex-characters"
@@ -106,7 +110,7 @@ dp --pt show "$CHECKPOINT" type-map descriptor fitting-net size
 
 Generate both `.pt2` artifacts with the candidate image's DPA4 AOTI freeze
 implementation: freeze the CPU artifact with GPUs hidden, then freeze the GPU
-artifact on the exact T4 being qualified. Do not rename a `.pt` checkpoint to
+artifact on the exact L20 being qualified. Do not rename a `.pt` checkpoint to
 `.pt2`, reuse the CPU artifact on GPU, or reuse an artifact frozen for another
 GPU family. The runner copies and hashes the supplied `.pt2`; it does not infer
 device compatibility from the suffix.
@@ -176,7 +180,7 @@ LAMMPS `metal` pressure is recorded in bar and converted to GPa by the parity
 script. The scripts reject missing or non-finite energy, stress, or force data.
 
 Run the phonoLAMMPS smoke on the Ti hcp case. This benchmark keeps `read_data`,
-relies on b95 `LAMMPS_PLUGIN_PATH` auto-loading, truncates the ordinary input
+uses the audited native library or plugin configuration, truncates the ordinary input
 after `pair_coeff`, passes a POSCAR, uses `--dim 2 2 2`, and expands
 `PRIMITIVE_AXES=P` to the identity matrix. It does not change APEX's legacy
 phonon input path for the old image:
@@ -250,8 +254,8 @@ status.
 ## GPU recommendation and prohibition boundary
 
 Use a passed manifest as one piece of evidence for the exact image digest,
-checkpoint hash, CPU/T4 `.pt2` hashes, T4 compute capability, driver, CUDA,
-single-rank command, and thread tuple. Do not generalize this v1 benchmark to
+checkpoint hash, CPU/L20 `.pt2` hashes, L20 compute capability, driver, CUDA,
+single-rank command, and thread tuple. Do not generalize this v3 benchmark to
 another GPU or mutable image tag. A single transient
 failure is not enough to prohibit a GPU combination: reproduce a deterministic
 hard failure in two fresh workspaces and preserve both manifests. Missing or

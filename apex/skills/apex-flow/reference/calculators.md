@@ -154,8 +154,8 @@ After publication, generate (do not hand-write) this image-resident contract:
         "type": "deepmd",
         "deepmd_runtime": "dpa4_pt2",
         "model_in_image": true,
-        "model": "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.t4-sm75.pt2",
-        "runtime_model_sha256": "2614db9463f5864d80a78fec037aeae26930df2004bb9f1148a69b83c25b3daf",
+        "model": "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.l20-sm89.pt2",
+        "runtime_model_sha256": "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369",
         "source_checkpoint": "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt",
         "source_checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
         "type_map": "auto"
@@ -163,17 +163,15 @@ After publication, generate (do not hand-write) this image-resident contract:
 }
 ```
 
-> Use `generate_config.py create --runtime-profile dpa4-alloytongqi-t4`.
-> It is currently locked by placeholder image identity and
-> `pre_snapshot_only` qualification. Pre-snapshot checks completed 12 LAMMPS
-> runs, 6 CPU/GPU parity checks, and one phonoLAMMPS smoke on one rank/one GPU
-> `c4_m15_1 * NVIDIA T4`; this is not exact-image acceptance. After a digest
-> rerun, only that exact SKU is eligible; c8/c16 T4 and non-T4 GPUs remain
-> unverified. The generated global config uses
-> `/usr/local/bin/dpa4-lmp -in in.lammps` and
+> Use `generate_config.py create --runtime-profile dpa4-alloytongqi-l20`.
+> Its profile must contain an immutable image identity and
+> `post_snapshot_passed` qualification. The target is one NVIDIA L20 (SM 8.9),
+> one MPI rank. Job SKU: `1 * NVIDIA L20_48g`; sandbox SKU:
+> `c16_m120_1 * NVIDIA L20`. T4 evidence does not qualify this target.
+> Generated commands use `/usr/local/bin/dpa4-lmp -in in.lammps` and
 > `/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} --dim {dim}
-> {primitive_axes}` exactly. V100/SM 7.0 and older devices and NVIDIA Linux
-> drivers below 580.65.06 are prohibited by the CUDA 13 contract. Use
+> {primitive_axes}`. Other GPUs, multi-rank and CPU production are unqualified.
+> Use
 > `"type_map": "auto"` by default. APEX infers the local contiguous type
 > mapping from the structure; do not copy atomic-number or model-internal
 > indices. A `.pt` checkpoint is directly usable only when it is a compatible

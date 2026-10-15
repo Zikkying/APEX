@@ -91,7 +91,7 @@ RECOMMENDED_SCASS = {
 
 # Triclinic / non-orthogonal cells: avoid deepmd-kit:3.1.1 (segfault)
 TRICLINIC_UNSAFE_TAGS = {"deepmd-kit:3.1.1"}
-DPA4_RUNTIME_PROFILE = "dpa4-alloytongqi-t4"
+DPA4_RUNTIME_PROFILE = "dpa4-alloytongqi-l20"
 
 
 def _dpa4_profile(*, require_published: bool) -> dict:
@@ -338,7 +338,7 @@ def list_combos(
             "DPA4 image 0.0.2 is validated on NVIDIA L20 and RTX 4090; L20 is the default GPU resource.",
             "DPA4 image 0.0.2 is blocked on CPU machines after sequential deployment timeouts.",
             "For triclinic cells, avoid deepmd-kit:3.1.1; prefer the DPA4 0.0.2 image.",
-            "The bundled dpa4-alloytongqi-t4 profile remains fail-closed until its immutable image ref@digest passes post-snapshot qualification.",
+            "The bundled dpa4-alloytongqi-l20 profile remains fail-closed until its immutable image ref@digest passes post-snapshot qualification.",
         ],
     }
 

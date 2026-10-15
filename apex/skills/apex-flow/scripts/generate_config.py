@@ -65,7 +65,7 @@ LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.
 # must select LAMMPS_GPU_IMAGE or LAMMPS_CPU_IMAGE from the potential type.
 LAMMPS_IMAGE = LAMMPS_GPU_IMAGE
 ABACUS_IMAGE = "registry.dp.tech/dptech/abacus:3.8.2"
-DPA4_RUNTIME_PROFILE = "dpa4-alloytongqi-t4"
+DPA4_RUNTIME_PROFILE = "dpa4-alloytongqi-l20"
 # Recommended Bohrium VASP run command pieces (Intel oneAPI + absolute vasp_std).
 # Do NOT auto-set vasp_image_name — VASP is commercial; only set an image after
 # the user confirms they have a license and provides/approves the image.

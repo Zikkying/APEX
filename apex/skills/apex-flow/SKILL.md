@@ -1,6 +1,6 @@
 ---
 name: apex-flow
-description: Run APEX relaxation and 15-property materials workflows with VASP, ABACUS, or LAMMPS, including EOS, elastic, surface/defect, phonon/Grüneisen, parent-aware Gamma line/surface, finite-temperature lattice/elastic/annealing, two-phase melting-point brackets, previews, reporting, and RSS/high-entropy generation. Supports the validated general DPA4 phonoLAMMPS runtime and a bundled alloytongqi checkpoint with a separate fail-closed T4 profile. Use for APEX, alloy properties, melting/coexistence, stacking faults, random solid solutions, or multi-property DFT/MLIP screening.
+description: Run APEX relaxation and 15-property materials workflows with VASP, ABACUS, or LAMMPS, including EOS, elastic, surface/defect, phonon/Grüneisen, parent-aware Gamma line/surface, finite-temperature lattice/elastic/annealing, two-phase melting-point brackets, previews, reporting, and RSS/high-entropy generation. Supports the validated general DPA4 phonoLAMMPS runtime and a bundled alloytongqi checkpoint with a separate fail-closed L20 profile. Use for APEX, alloy properties, melting/coexistence, stacking faults, random solid solutions, or multi-property DFT/MLIP screening.
 ---
 
 # APEX Flow — Alloy Properties EXplorer
@@ -77,14 +77,23 @@ Options to offer via AskQuestion:
     endpoint itself was pull-denied, so retain the tested mirror digest in any
     report. Keep this old image as the general APEX default and the legacy
     phonon/Grüneisen forced image; do not submit DPA4 through it.
-  - For DPA4, use `--runtime-profile dpa4-alloytongqi-t4`. It remains locked
-    while its image ref/digest placeholders or `pre_snapshot_only` status are
-    present. The recorded `c4_m15_1 * NVIDIA T4` run is candidate evidence,
-    not exact-image acceptance or a current recommendation.
+  - For DPA4, use `--runtime-profile dpa4-alloytongqi-l20`. The generator
+    requires the exact image digest and `post_snapshot_passed` evidence.
+    T4 is absent from the sandbox catalog checked on 2026-10-15; historical
+    T4 results do not qualify L20. Never transplant a T4 `.pt2`.
     Once published, the generator must write
     `/usr/local/bin/dpa4-lmp -in in.lammps` and the full
     `/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} --dim {dim}
     {primitive_axes}` template; never shorten or override these entrypoints.
+    The runtime model and scientific packages are already in that image.
+    Do not run `pip install --upgrade` for DeepMD, PyTorch, LAMMPS or
+    phonoLAMMPS, and do not freeze another model during a production job.
+  - **Never bypass an unpublished profile by editing its qualification status,
+    inventing an image digest (including all zeros), deleting compatibility
+    restrictions, or patching submission validators.** Report the concrete
+    missing runtime evidence and repair the runtime before submitting. Do not
+    offer "bypass DPA4 validation" as a backend choice. A change to EAM or DFT
+    changes the requested scientific model and requires the user's choice.
   - Do not invent a model path or download another default model. Use a
     different user-provided compatible model only when the user explicitly
     requests it; explain the change and obtain confirmation first.
@@ -177,21 +186,20 @@ Options to offer via AskQuestion:
      --image registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2 \
      --scass "1 * NVIDIA L20_48g"
   ```
-   Do **not** hardcode an unverified `scass_type`. Prefer `recommend` / `list-combos` output. Known failures include `deepmd-kit:3.1.0`, `3.1.1-cuda12.1`, `3.1.2`, the combination `deepmd-kit:3.1.1` × `NVIDIA T4`, `c4_m16_cpu`, and `c12_m46_1 * NVIDIA T4`. GPU LAMMPS potentials (`deepmd`, `mace`, `nep`) use `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` with NVIDIA L20 by default; RTX 4090 remains a validated compatible option. CPU LAMMPS potentials use `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post`; never pair 0.0.2 with a `*_cpu` machine because sequential CPU validation stalled before the container command started. `apex submit` only enforces 0.0.2 for GPU-potential phonon and Grüneisen workflows. Do not emit `plugin load libdeepmd_lmp.so` for 0.0.2.
-   Do **not** hardcode an unverified `scass_type`. Prefer `recommend` / `list-combos` output. GPU LAMMPS potentials (`deepmd`, `mace`, `nep`) use `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` with NVIDIA L20 by default; RTX 4090 is also validated. CPU LAMMPS potentials use the APEX CPU image. Never pair 0.0.2 with a `*_cpu` machine, and do not emit `plugin load libdeepmd_lmp.so` for its integrated USER-DEEPMD build.
-   For DPA4, inspect the locked candidate matrix with
-   `list-combos --runtime-profile dpa4-alloytongqi-t4`; `recommend` must fail
-   until exact `ref@sha256` post-snapshot qualification is recorded. After
-   publication, only one rank/one GPU on exact `c4_m15_1 * NVIDIA T4` is
-   eligible. Other T4 SKUs (including c8/c16), every non-T4 GPU, CPU,
-   multi-rank, multi-GPU, and cross-architecture PT2 reuse remain unverified or
-   prohibited and therefore fail closed. V100/SM 7.0 and older GPUs, and an
-   NVIDIA Linux driver below 580.65.06, are prohibited by the CUDA 13 runtime.
+   Use `recommend` / `list-combos` for the selected runtime profile.
+   The general DPA4 image 0.0.2 and the bundled alloytongqi profile are separate
+   contracts. For alloytongqi, use the dedicated L20 image, one GPU and one MPI
+   rank. Job `scass_type` is `1 * NVIDIA L20_48g`; sandbox SKU
+   `c16_m120_1 * NVIDIA L20` must never be copied into a job submission.
+   The L20 SM 8.9 artifact is not qualified for CPU, another GPU family,
+   multiple GPUs or multiple ranks. 4090 checkpoint inference alone does not
+   qualify the production image. If profile validation fails, report its
+   evidence gap and stop that submission; never edit the profile to bypass it.
 10. **Treat the bundled DPA4 checkpoint as provenance, not a LAMMPS input.** The
    skill ships only `models/DPA4-alloytongqi/model.pt`, the user-supplied
    single-task `alloytongqi` checkpoint. Generate the image-resident contract
    only with `generate_config.py create --runtime-profile
-   dpa4-alloytongqi-t4`; never hand-write its paths/hashes. The command remains
+   dpa4-alloytongqi-l20`; never hand-write its paths/hashes. The command remains
    blocked until publication. No alternate-model downloader is bundled. See
    `models/README.md`.
 11. **STOP: Check atom count / cell size before property submit — decide whether to expand.**
@@ -406,7 +414,7 @@ See `reference/submission.md` for the full validated template.
 
 1. **Finite-temperature backend limits**: `finite_t_elastic` and `melting_point` are LAMMPS-only. `finite_t_latt` and `annealing` support LAMMPS and VASP, but not ABACUS. VASP uses `MDALGO=3` and requires a binary compiled with `-Dtbdyn`; annealing `protocol="coexistence"` is a fixed-temperature equilibration plus production run and is not the q6/interface-velocity `melting_point` method. Only `melting_point` transports `restart_files` as `restart.coexistence.start`.
 2. **Model paths must match the runtime contract.** Ordinary MLIP model files
-   must be in the job directory and use relative paths. The DPA4 T4 profile is
+   must be in the job directory and use relative paths. The DPA4 L20 profile is
    the exception: do not stage or execute the bundled `.pt`; its exact contract
    uses a hashed image-resident `.pt2` and is generated only after publication.
    Default to `"type_map": "auto"`.

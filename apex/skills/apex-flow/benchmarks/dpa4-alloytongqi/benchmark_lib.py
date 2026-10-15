@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = "2.0.0"
-BENCHMARK_ID = "dpa4-alloytongqi-small-cell-gpu-compat-v2"
+SCHEMA_VERSION = "3.0.0"
+BENCHMARK_ID = "dpa4-alloytongqi-small-cell-l20-compat-v3"
 EXPECTED_MODEL_SHA256 = (
     "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad"
 )
@@ -115,7 +115,7 @@ def normalize_image_identity(
         digest = digest or ref_digest
     if reference is None:
         reasons.append("IMAGE_REFERENCE_MISSING")
-    if digest is None or not SHA256_RE.fullmatch(digest):
+    if digest is None or not SHA256_RE.fullmatch(digest) or digest == "sha256:" + "0" * 64:
         reasons.append("IMAGE_DIGEST_MISSING_OR_INVALID")
     return {"reference": reference, "digest": digest}, reasons
 
@@ -424,6 +424,34 @@ def runtime_model_identity(
     return descriptor, reasons
 
 
+def ldd_library_paths(stdout: str) -> set[str]:
+    """Read complete linked paths; a longer filename is not an exact match."""
+    return set(re.findall(r"(?:^\s*|=>\s+)(/[^\s]+)(?=\s|$)", stdout, re.MULTILINE))
+
+
+def probe_builtin_lammps(binary: str, library: str) -> tuple[dict[str, Any], list[str]]:
+    """Identify a native DeepMD build instead of assuming a dynamic plugin."""
+    evidence: dict[str, Any] = {}
+    reasons = []
+    for key, raw in (("binary", binary), ("library", library)):
+        path = Path(raw).resolve()
+        if not path.is_file():
+            reasons.append(f"LAMMPS_BUILTIN_{key.upper()}_MISSING")
+        else:
+            evidence[key] = describe_file(path)
+    if reasons:
+        return evidence, reasons
+    help_probe = _run_probe([binary, "-h"], timeout=30)
+    link_probe = _run_probe(["ldd", binary])
+    evidence.update(help_probe=help_probe, link_probe=link_probe)
+    if help_probe["exit_code"] != 0 or not re.search(r"(?<!\S)deepmd(?!\S)", help_probe["stdout"]):
+        reasons.append("LAMMPS_BUILTIN_DEEPMD_STYLE_MISSING")
+    if link_probe["exit_code"] != 0 or str(Path(library).resolve()) not in ldd_library_paths(link_probe["stdout"]):
+        reasons.append("LAMMPS_BUILTIN_LIBRARY_NOT_LINKED")
+    evidence["verified"] = not reasons
+    return evidence, reasons
+
+
 def resolve_lammps_plugin_path(
     explicit: str | None, inherited: str | None
 ) -> tuple[str | None, list[dict[str, Any]], list[str]]:
@@ -485,41 +513,41 @@ def single_rank_command_reasons(
     return []
 
 
-def t4_environment_reasons(
+def l20_environment_reasons(
     environment: dict[str, Any], gpu_index: str
 ) -> list[str]:
     inventory = environment.get("gpu_inventory", [])
     selected = [item for item in inventory if str(item.get("index")) == str(gpu_index)]
     if len(selected) != 1:
-        return ["T4_GPU_NOT_UNIQUELY_IDENTIFIED"]
+        return ["L20_GPU_NOT_UNIQUELY_IDENTIFIED"]
     name = str(selected[0].get("name", "")).strip()
-    if not re.search(r"(?:^|\s)T4$", name, re.IGNORECASE):
-        return [f"GPU_NOT_T4:{name or 'unknown'}"]
+    if not re.search(r"(?:^|\s)L20$", name, re.IGNORECASE):
+        return [f"GPU_NOT_L20:{name or 'unknown'}"]
     reasons = []
     for field in ("uuid", "driver_version", "compute_capability"):
         if not str(selected[0].get(field, "")).strip():
-            reasons.append(f"T4_{field.upper()}_MISSING")
+            reasons.append(f"L20_{field.upper()}_MISSING")
     if selected[0].get("memory_mib") is None:
-        reasons.append("T4_MEMORY_MIB_MISSING")
-    if str(selected[0].get("compute_capability", "")).strip() != "7.5":
-        reasons.append("T4_COMPUTE_CAPABILITY_NOT_7_5")
+        reasons.append("L20_MEMORY_MIB_MISSING")
+    if str(selected[0].get("compute_capability", "")).strip() != "8.9":
+        reasons.append("L20_COMPUTE_CAPABILITY_NOT_8_9")
     return reasons
 
 
-def t4_environment_reasons_for_device(
+def l20_environment_reasons_for_device(
     environment: dict[str, Any], gpu_index: str, device: str
 ) -> list[str]:
-    """Require an exact T4 only for GPU legs.
+    """Require an exact L20 only for GPU legs.
 
-    CPU parity intentionally runs in the same candidate image on the same T4
+    CPU parity intentionally runs in the same candidate image on the same L20
     node with ``CUDA_VISIBLE_DEVICES`` empty.  Its hardware inventory is useful
     provenance, but the CPU command must not be rejected merely because the
-    host still exposes a T4 to ``nvidia-smi``.
+    host still exposes a L20 to ``nvidia-smi``.
     """
 
     if device == "cpu":
         return []
-    return t4_environment_reasons(environment, gpu_index)
+    return l20_environment_reasons(environment, gpu_index)
 
 
 def missing_package_reasons(environment: dict[str, Any]) -> list[str]:

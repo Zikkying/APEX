@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "profile_id": "dpa4-alloytongqi-l20",
+    "description": "DPA4 alloytongqi runtime compiled and tested for one NVIDIA L20 SM 8.9; awaiting exact-image qualification.",
+    "qualification_status": "pre_snapshot_only",
+    "image": {
+        "ref": "registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-02",
+        "digest": "__DPA4_IMAGE_DIGEST__"
+    },
+    "calculator": {
+        "backend": "lammps",
+        "potential": "deepmd",
+        "run_command": "/usr/local/bin/dpa4-lmp -in in.lammps",
+        "phonolammps_command": "/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+    },
+    "runtime": {
+        "kind": "dpa4_pt2",
+        "model_in_image": true,
+        "model_path": "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.l20-sm89.pt2",
+        "model_sha256": "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369",
+        "source_checkpoint_path": "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt",
+        "source_checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+        "type_map": "auto"
+    },
+    "machine_compatibility": {
+        "recommended": [
+            {
+                "scass_type": "1 * NVIDIA L20_48g",
+                "mpi_ranks": 1,
+                "gpu_count": 1,
+                "status": "candidate_after_publish",
+                "evidence": "Source sandbox L20: raw checkpoint inference, native LAMMPS run0/MD and phonoLAMMPS completed; exact-image acceptance pending."
+            }
+        ],
+        "sandbox": {
+            "template_id": "scicomp-l20",
+            "sku_name": "c16_m120_1 * NVIDIA L20",
+            "compute_capability": "8.9",
+            "catalog_checked": "2026-10-15"
+        },
+        "prohibited_exact": {
+            "c4_m15_1 * NVIDIA T4": "T4 is absent from the current sandbox catalog and this artifact targets L20.",
+            "c16_m120_1 * NVIDIA L20": "Sandbox SKU only; job submissions must use 1 * NVIDIA L20_48g."
+        },
+        "prohibited_classes": {
+            "cpu": "Production artifact is GPU-specific; CPU artifact is for parity only.",
+            "multi_gpu": "Only one MPI rank on one L20 is qualified.",
+            "cross_arch_pt2": "Do not reuse the SM 8.9 artifact on a different architecture."
+        },
+        "unverified": [
+            "RTX 4090: checkpoint inference only, no production image qualification.",
+            "RTX 5090, A100 and RTX PRO 5000: listed in sandbox catalog but not runtime-qualified.",
+            "Other L20 SKUs: require their own execution receipts."
+        ],
+        "unknown_policy": "fail_closed"
+    }
+}

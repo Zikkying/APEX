@@ -124,7 +124,7 @@ class TestLammps(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp).resolve() / "case" / "relaxation" / "relax_task"
             output_dir.mkdir(parents=True)
-            model = "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.t4-sm75.pt2"
+            model = "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.l20-sm89.pt2"
             interaction = {
                 "type": "deepmd",
                 "model": model,

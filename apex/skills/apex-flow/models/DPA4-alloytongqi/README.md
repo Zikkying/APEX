@@ -13,12 +13,11 @@
   initializing `pair_style deepmd`.
 
 Keep `model.pt` as the source identity; never pass it directly to LAMMPS under
-the DPA4 T4 profile. That profile is currently locked by image placeholders and
-`pre_snapshot_only` qualification. Pre-snapshot checks passed on one rank/one
-GPU at `c4_m15_1 * NVIDIA T4`, but this is not exact-image acceptance; c8/c16
-T4 and non-T4 GPUs remain unverified. After an immutable digest rerun, generate
-the hashed image-resident `.pt2` interaction with `--runtime-profile
-dpa4-alloytongqi-t4`; its generated commands use absolute
+the DPA4 L20 profile. The active profile requires an immutable image digest and
+`post_snapshot_passed` qualification on L20 SM 8.9. T4 is absent from the current
+sandbox catalog; its old artifacts are not interchangeable with the L20 build.
+Generate using `generate_config.py create --runtime-profile
+dpa4-alloytongqi-l20`; its generated commands use absolute
 `/usr/local/bin/dpa4-lmp` and `/usr/local/bin/dpa4-phonolammps` wrappers. The configured `registry.dp.tech` endpoint was
 pull-denied; the legacy digest above identifies the tested artifact from
 `registry.bohrium.dp.tech`.

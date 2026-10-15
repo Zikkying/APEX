@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 from pathlib import Path
 from typing import Sequence
 
@@ -15,6 +16,7 @@ from benchmark_lib import (
     REQUIRED_PACKAGES,
     SHA256_RE,
     load_json,
+    ldd_library_paths,
     sha256_file,
 )
 
@@ -53,7 +55,7 @@ def verify(manifest_path: Path, root: Path) -> list[str]:
     missing_top = sorted(required_top - set(manifest))
     if missing_top:
         errors.append("missing top-level fields: " + ", ".join(missing_top))
-    if manifest.get("schema_version") != "2.0.0":
+    if manifest.get("schema_version") != "3.0.0":
         errors.append("schema_version mismatch")
     if manifest.get("benchmark_id") != BENCHMARK_ID:
         errors.append("benchmark_id mismatch")
@@ -88,7 +90,7 @@ def verify(manifest_path: Path, root: Path) -> list[str]:
                 errors.append(f"runtime_models_pt2[{index}] has invalid sources")
     digest = manifest.get("identity", {}).get("image", {}).get("digest")
     if digest is not None and not (
-        isinstance(digest, str) and SHA256_RE.fullmatch(digest)
+        isinstance(digest, str) and SHA256_RE.fullmatch(digest) and digest != "sha256:" + "0" * 64
     ):
         errors.append("image digest is present but invalid")
     if status == "passed" and not (isinstance(digest, str) and SHA256_RE.fullmatch(digest)):
@@ -228,10 +230,10 @@ def verify(manifest_path: Path, root: Path) -> list[str]:
             errors.append("passed manifest lacks a complete GPU/driver/CUDA observation")
         for observation in observations:
             for gpu in observation.get("gpu_inventory", []):
-                if not str(gpu.get("name", "")).strip().lower().endswith("t4"):
-                    errors.append("passed manifest contains a non-T4 GPU observation")
-                if str(gpu.get("compute_capability", "")).strip() != "7.5":
-                    errors.append("passed manifest T4 compute capability is not 7.5")
+                if not str(gpu.get("name", "")).strip().lower().endswith("l20"):
+                    errors.append("passed manifest contains a non-L20 GPU observation")
+                if str(gpu.get("compute_capability", "")).strip() != "8.9":
+                    errors.append("passed manifest L20 compute capability is not 8.9")
         for observation in observations:
             packages = observation.get("packages", {})
             missing = [name for name in REQUIRED_PACKAGES if not packages.get(name)]
@@ -239,23 +241,39 @@ def verify(manifest_path: Path, root: Path) -> list[str]:
                 errors.append(
                     "environment observation lacks package versions: " + ", ".join(missing)
                 )
-            plugin_path = observation.get("selected_environment", {}).get(
-                "LAMMPS_PLUGIN_PATH"
-            )
-            if not plugin_path:
-                errors.append("passed manifest lacks LAMMPS_PLUGIN_PATH")
-            plugins = observation.get("lammps_plugins", [])
-            if not plugins:
-                errors.append("passed manifest lacks hashed b95 LAMMPS plugin evidence")
-            elif not any(
-                Path(plugin.get("path", "")).name == "libdeepmd_lmpplugin.so"
-                and isinstance(plugin.get("sha256"), str)
-                and HEX_SHA256_RE.fullmatch(plugin["sha256"])
-                for plugin in plugins
-            ):
-                errors.append(
-                    "passed manifest lacks libdeepmd_lmpplugin.so hash evidence"
+            builtin = observation.get("lammps_builtin")
+            if builtin:
+                if builtin.get("verified") is not True:
+                    errors.append("passed manifest has unverified builtin LAMMPS")
+                for key in ("binary", "library"):
+                    item = builtin.get(key, {})
+                    if not HEX_SHA256_RE.fullmatch(str(item.get("sha256", ""))):
+                        errors.append(f"builtin LAMMPS lacks {key} hash")
+                probe = builtin.get("help_probe", {})
+                if probe.get("exit_code") != 0 or not re.search(r"(?<!\S)deepmd(?!\S)", probe.get("stdout", "")):
+                    errors.append("builtin LAMMPS lacks deepmd style proof")
+                link = builtin.get("link_probe", {})
+                library = builtin.get("library", {}).get("path")
+                if not library or link.get("exit_code") != 0 or library not in ldd_library_paths(link.get("stdout", "")):
+                    errors.append("builtin LAMMPS lacks library link proof")
+            else:
+                plugin_path = observation.get("selected_environment", {}).get(
+                    "LAMMPS_PLUGIN_PATH"
                 )
+                if not plugin_path:
+                    errors.append("passed manifest lacks LAMMPS_PLUGIN_PATH")
+                plugins = observation.get("lammps_plugins", [])
+                if not plugins:
+                    errors.append("passed manifest lacks hashed b95 LAMMPS plugin evidence")
+                elif not any(
+                    Path(plugin.get("path", "")).name == "libdeepmd_lmpplugin.so"
+                    and isinstance(plugin.get("sha256"), str)
+                    and HEX_SHA256_RE.fullmatch(plugin["sha256"])
+                    for plugin in plugins
+                ):
+                    errors.append(
+                        "passed manifest lacks libdeepmd_lmpplugin.so hash evidence"
+                    )
         runtime_models = manifest.get("identity", {}).get("runtime_models_pt2", [])
         if len(runtime_models) != 2:
             errors.append("passed manifest must contain exactly CPU and GPU .pt2 identities")

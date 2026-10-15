@@ -1,4 +1,4 @@
-"""Load and validate the skill's immutable DPA4 alloytongqi T4 profile."""
+"""Load and validate the skill's immutable DPA4 alloytongqi L20 profile."""
 
 from __future__ import annotations
 
@@ -7,11 +7,11 @@ import re
 from pathlib import Path
 
 
-DPA4_PROFILE_ID = "dpa4-alloytongqi-t4"
+DPA4_PROFILE_ID = "dpa4-alloytongqi-l20"
 DPA4_PROFILE_PATH = (
     Path(__file__).resolve().parent.parent
     / "data"
-    / "dpa4_alloytongqi_t4_profile.json"
+    / "dpa4_alloytongqi_l20_profile.json"
 )
 DPA4_IMAGE_REF_PLACEHOLDER = "__DPA4_IMAGE_REF__"
 DPA4_IMAGE_DIGEST_PLACEHOLDER = "__DPA4_IMAGE_DIGEST__"
@@ -22,10 +22,10 @@ DPA4_PHONOLAMMPS_RUN_COMMAND = (
 )
 DPA4_RUNTIME_MODEL_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/"
-    "alloytongqi.t4-sm75.pt2"
+    "alloytongqi.l20-sm89.pt2"
 )
 DPA4_RUNTIME_MODEL_SHA256 = (
-    "2614db9463f5864d80a78fec037aeae26930df2004bb9f1148a69b83c25b3daf"
+    "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369"
 )
 DPA4_SOURCE_CHECKPOINT_PATH = (
     "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt"
@@ -79,6 +79,7 @@ def validate_dpa4_profile(
         and "@" not in image_ref
         and image_digest != DPA4_IMAGE_DIGEST_PLACEHOLDER.lower()
         and _IMAGE_DIGEST_RE.fullmatch(image_digest) is not None
+        and image_digest != "sha256:" + "0" * 64
     )
     qualification_status = str(profile.get("qualification_status", "")).strip()
     qualified = qualification_status == "post_snapshot_passed"
@@ -90,19 +91,18 @@ def validate_dpa4_profile(
         missing = []
         if not identity_finalized:
             missing.append(
-                f"replace {DPA4_IMAGE_REF_PLACEHOLDER} and "
-                f"{DPA4_IMAGE_DIGEST_PLACEHOLDER}"
+                "the released image identity is unavailable"
             )
         if not qualified:
             missing.append(
-                "set qualification_status='post_snapshot_passed' only after "
-                "the exact ref@digest passes the packaged benchmark"
+                "the exact image has no completed post-snapshot qualification"
             )
         raise RuntimeError(
             "DPA4 production profile is not published: "
             + "; ".join(missing)
-            + ". Update data/dpa4_alloytongqi_t4_profile.json before "
-            "generating, recommending, or submitting this profile"
+            + ". A qualified release from the runtime maintainer is required. "
+            "Do not edit the profile status or digest, remove validation, or "
+            "substitute another potential to bypass this error."
         )
 
     calculator = profile.get("calculator")
@@ -120,13 +120,13 @@ def validate_dpa4_profile(
     combo = recommended[0]
     if (
         not isinstance(combo, dict)
-        or combo.get("scass_type") != "c4_m15_1 * NVIDIA T4"
+        or combo.get("scass_type") != "1 * NVIDIA L20_48g"
         or combo.get("mpi_ranks") != 1
         or combo.get("gpu_count") != 1
     ):
         raise RuntimeError(
             "DPA4 production profile must remain one rank on one "
-            "c4_m15_1 NVIDIA T4"
+            "NVIDIA L20_48g"
         )
     if calculator.get("backend") != "lammps" or calculator.get("potential") != "deepmd":
         raise RuntimeError("DPA4 profile must use the LAMMPS + DeePMD calculator")

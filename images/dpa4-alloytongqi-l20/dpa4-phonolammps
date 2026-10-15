@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export PATH="/opt/mamba/bin:${PATH:-/usr/bin:/bin}"
+export LD_LIBRARY_PATH="/opt/lammps-sm89/lib:/root/Software/deepmd-kit_cpp/lib:/opt/mamba/lib/python3.13/site-packages/torch/lib:/opt/mamba/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DP_BACKEND_PLUGIN_PATH=/root/Software/deepmd-kit_cpp/lib
+export DP_COMPILE_INFER=0 DP_AMP_INFER=0 DP_TRITON_INFER=0 DP_CUTE_INFER=0 DP_TF32_INFER=0
+export OMP_NUM_THREADS=1 DP_INTRA_OP_PARALLELISM_THREADS=1 DP_INTER_OP_PARALLELISM_THREADS=1
+exec /opt/mamba/bin/python /opt/dpa4-runtime/phonolammps_native.py "$@"

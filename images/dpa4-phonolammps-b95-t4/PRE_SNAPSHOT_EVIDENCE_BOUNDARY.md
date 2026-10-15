@@ -30,3 +30,9 @@ Promotion requires all of the following against the published immutable
    one MPI rank, wrapper hashes, PT2 hashes, and result evidence;
 4. change the Skill profile from `pre_snapshot_only` to
    `post_snapshot_passed` only after all checks pass.
+
+## Superseded target
+
+The 2026-10-15 sandbox catalog has no T4. The old profile is preserved here as
+`dpa4_alloytongqi_t4_profile.pre_snapshot.json` for historical provenance only.
+The active candidate is L20 SM 8.9; T4 results do not qualify that target.

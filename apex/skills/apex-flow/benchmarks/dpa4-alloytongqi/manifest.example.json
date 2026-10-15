@@ -1,7 +1,7 @@
 {
   "$schema": "./manifest.schema.json",
-  "schema_version": "2.0.0",
-  "benchmark_id": "dpa4-alloytongqi-small-cell-gpu-compat-v2",
+  "schema_version": "3.0.0",
+  "benchmark_id": "dpa4-alloytongqi-small-cell-l20-compat-v3",
   "created_at": null,
   "status": "untested",
   "reason_codes": [
@@ -68,6 +68,6 @@
   "notes": [
     "This example intentionally contains no image, GPU, package, exit-code, stderr, or numerical result claims.",
     "The checkpoint .pt is identity/probe input only; LAMMPS requires device-specific .pt2 runtime artifacts.",
-    "An empty runtime_models_pt2 list means no CPU/T4 runtime execution artifact has been recorded."
+    "An empty runtime_models_pt2 list means no CPU/L20 runtime execution artifact has been recorded."
   ]
 }

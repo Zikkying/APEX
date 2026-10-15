@@ -1,0 +1,262 @@
+{
+  "qualification_status": "pre_snapshot_only",
+  "sandbox_gpu_catalog_checked": "2026-10-15",
+  "T4_present": false,
+  "checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+  "l20_runtime_sha256": "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369",
+  "cpu_runtime_sha256": "e2d3423db844560423715c6b6c460e1ff1e5783442974cc73a16396872ddefb7",
+  "checkpoint_quick_benchmark": {
+    "L20": {
+      "torch": "2.11.0+cu128",
+      "gpu": "NVIDIA L20",
+      "capability": [
+        8,
+        9
+      ],
+      "checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+      "records": [
+        {
+          "atoms": 4,
+          "energy": -6329.8153015764965,
+          "force_max": 1.1399821886470818e-07,
+          "seconds": [
+            4.591385497000033,
+            0.035173269000040364,
+            0.03404280799998105,
+            0.033581491000006736,
+            0.033617875999993885,
+            0.033705420999979196
+          ],
+          "median_warm_seconds": 0.033705420999979196
+        },
+        {
+          "atoms": 32,
+          "energy": -59244.15001746522,
+          "force_max": 0.27010801214282765,
+          "seconds": [
+            0.08745101099998465,
+            0.03446740399999726,
+            0.03365879800003313,
+            0.03376745700001038,
+            0.03553966399999808,
+            0.03648068100000046
+          ],
+          "median_warm_seconds": 0.03446740399999726
+        },
+        {
+          "atoms": 108,
+          "energy": -208832.37083375128,
+          "force_max": 0.758831282320898,
+          "seconds": [
+            0.04975190499999371,
+            0.0441637769999943,
+            0.044095937999998114,
+            0.04616148899998507,
+            0.04426336500000616,
+            0.04422250899995106
+          ],
+          "median_warm_seconds": 0.04422250899995106
+        }
+      ],
+      "total_seconds": 7.372451628000022
+    },
+    "4090": {
+      "torch": "2.11.0+cu128",
+      "gpu": "NVIDIA GeForce RTX 4090",
+      "capability": [
+        8,
+        9
+      ],
+      "checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+      "records": [
+        {
+          "atoms": 4,
+          "energy": -6329.815300995351,
+          "force_max": 1.0123597693478814e-07,
+          "seconds": [
+            4.5726967189999925,
+            0.04256980400000998,
+            0.0437359739999863,
+            0.044058562999993,
+            0.038644156000003704,
+            0.037020651000005955
+          ],
+          "median_warm_seconds": 0.04256980400000998
+        },
+        {
+          "atoms": 32,
+          "energy": -59244.15001877652,
+          "force_max": 0.2701076529921238,
+          "seconds": [
+            0.09059126500000048,
+            0.036567472000001544,
+            0.03536354100000949,
+            0.03562659899998266,
+            0.03618488700001876,
+            0.03538980100000799
+          ],
+          "median_warm_seconds": 0.03562659899998266
+        },
+        {
+          "atoms": 108,
+          "energy": -208832.3708386016,
+          "force_max": 0.7588311242689088,
+          "seconds": [
+            0.049280200999987755,
+            0.04360297200000218,
+            0.04280945100001077,
+            0.042672823000003746,
+            0.04275942700002133,
+            0.04305678899999066
+          ],
+          "median_warm_seconds": 0.04280945100001077
+        }
+      ],
+      "total_seconds": 8.443477397999999
+    }
+  },
+  "cpu_gpu_parity": [
+    {
+      "case": "Ti_hcp",
+      "mode": "run0",
+      "energy_per_atom_abs_eV": 3.175800884491764e-07,
+      "force_rms_eV_A": 2.3070204122776752e-07,
+      "force_max_eV_A": 3.651947e-07,
+      "stress_max_GPa": 2.1486497069781763e-05,
+      "numerically_passed": true
+    },
+    {
+      "case": "Ti_hcp",
+      "mode": "md",
+      "energy_per_atom_abs_eV": 1.1920997167180758e-07,
+      "force_rms_eV_A": 8.16496580908713e-08,
+      "force_max_eV_A": 9.999999999940612e-08,
+      "stress_max_GPa": 7.678065404002155e-06,
+      "numerically_passed": true
+    },
+    {
+      "case": "V_bcc",
+      "mode": "run0",
+      "energy_per_atom_abs_eV": 2.980004865094088e-08,
+      "force_rms_eV_A": 1.0303822914806523e-07,
+      "force_max_eV_A": 1.65717e-07,
+      "stress_max_GPa": 2.5262773780559656e-05,
+      "numerically_passed": true
+    },
+    {
+      "case": "V_bcc",
+      "mode": "md",
+      "energy_per_atom_abs_eV": 2.384149411227554e-07,
+      "force_rms_eV_A": 8.485281374357181e-07,
+      "force_max_eV_A": 1.0000000000287557e-06,
+      "stress_max_GPa": 8.34112369993818e-06,
+      "numerically_passed": true
+    },
+    {
+      "case": "TiV_B2",
+      "mode": "run0",
+      "energy_per_atom_abs_eV": 2.2351991901814472e-07,
+      "force_rms_eV_A": 5.751697425264997e-08,
+      "force_max_eV_A": 9.56352e-08,
+      "stress_max_GPa": 2.1668797908932902e-05,
+      "numerically_passed": true
+    },
+    {
+      "case": "TiV_B2",
+      "mode": "md",
+      "energy_per_atom_abs_eV": 2.7567512006498873e-07,
+      "force_rms_eV_A": 8.246211251354642e-07,
+      "force_max_eV_A": 1.0000000000287557e-06,
+      "stress_max_GPa": 7.393564819358289e-06,
+      "numerically_passed": true
+    }
+  ],
+  "phonolammps": {
+    "atoms": 16,
+    "matrix_blocks": 256,
+    "finite_values": 2304
+  },
+  "apex_generated_single_point": {
+    "atoms": 108,
+    "formula": "Fe36 Co36 Ni36",
+    "exit_code": 0,
+    "apex_parse_succeeded": true
+  },
+  "scope": "Source sandbox observations only; no published-image or job-SKU qualification.",
+  "runtime_build_manifest": {
+    "target": "NVIDIA L20",
+    "compute_capability": "8.9",
+    "mpi_ranks": 1,
+    "source_checkpoint_sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+    "qualification_status": "candidate_requires_post_snapshot_benchmark",
+    "base_image": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
+    "files": [
+      {
+        "path": "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.cpu-x86_64.pt2",
+        "sha256": "e2d3423db844560423715c6b6c460e1ff1e5783442974cc73a16396872ddefb7",
+        "bytes": 73212507
+      },
+      {
+        "path": "/opt/dpa4-runtime/models/DPA4-alloytongqi/alloytongqi.l20-sm89.pt2",
+        "sha256": "fd837257a08121bf56f739dff6353dbbc6b06cbd2db05125211face96bcb5369",
+        "bytes": 79399227
+      },
+      {
+        "path": "/opt/dpa4-runtime/models/DPA4-alloytongqi/model.pt",
+        "sha256": "c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad",
+        "bytes": 30403297
+      },
+      {
+        "path": "/opt/lammps-sm89/bin/lmp",
+        "sha256": "083d8c15efac47af284c9b07424ec4ff06c5d3837281adbc3ad03d9480570bab",
+        "bytes": 1004168
+      },
+      {
+        "path": "/opt/lammps-sm89/lib/liblammps.so.0",
+        "sha256": "d09f4499c538493cc86a267ef778ee34767659485a938ed345f92779fd7a424f",
+        "bytes": 139264680
+      },
+      {
+        "path": "/root/Software/deepmd-kit_cpp/lib/libdeepmd_backend_ptexpt.so",
+        "sha256": "2e682fc5b960e386050d51bd03b5a715877835eca8dc7ef9d3d1a3a8225a5352",
+        "bytes": 856936
+      },
+      {
+        "path": "/opt/dpa4-runtime/phonolammps_native.py",
+        "sha256": "5be96987837de4bb0e10b40091fcf27ad22382d45bcc774e254af20a0380661d",
+        "bytes": 738
+      },
+      {
+        "path": "/usr/local/bin/dpa4-lmp",
+        "sha256": "729f68c833dcc8b6ca8cf6c70216f72ce1df2715165a2670ce00775d9c4d2e38",
+        "bytes": 555
+      },
+      {
+        "path": "/usr/local/bin/dpa4-phonolammps",
+        "sha256": "309956afb8a0ea616989066b582acbdfbb6ae75f5256b40e98ff13f511f0aca9",
+        "bytes": 592
+      },
+      {
+        "path": "/usr/local/bin/dpa4-python",
+        "sha256": "2e662a6279b835053783abc4df2eda9856f801f02a1f13f2b9c0c5d0c665a307",
+        "bytes": 552
+      }
+    ],
+    "packages": {
+      "deepmd-kit": "3.1.2.dev0+g38dfe2b",
+      "torch": "2.11.0+cu128",
+      "lammps": "2025.7.22.2.0",
+      "phonolammps": "0.10.1",
+      "phonopy": "4.4.0",
+      "dpdata": "1.0.1",
+      "numpy": "2.4.3"
+    },
+    "gpu": "name, uuid, driver_version, compute_cap\nNVIDIA L20, GPU-4091e262-46bc-e77b-8487-ed5f8aea6d1e, 580.95.05, 8.9\n"
+  },
+  "raw_evidence_archive_sha256": "c80362a4e261dc19eb88b46b85d80dea696cd35e60b652a997b27d6ed27f7381",
+  "test_suite": {
+    "run": 636,
+    "skipped": 1,
+    "result": "OK"
+  }
+}

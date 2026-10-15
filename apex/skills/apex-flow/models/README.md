@@ -42,24 +42,25 @@ configured registry endpoint itself was not readable. Do not submit this model
 with the default old image. Keep that image as the general default and legacy
 phonon/Grüneisen forced runtime.
 
-The new `dpa4-alloytongqi-t4` profile is still unpublished: its image ref and
-digest are placeholders and its qualification is `pre_snapshot_only`.
-Pre-snapshot checks completed 12 LAMMPS runs, 6 CPU/GPU parity comparisons,
-and one phonoLAMMPS smoke on one rank/one GPU at
-`c4_m15_1 * NVIDIA T4`. This is candidate evidence, not exact-image or registry
-acceptance. c8/c16 T4, every non-T4 GPU, CPU, multi-rank, multi-GPU, and
-cross-architecture PT2 reuse remain unverified or prohibited.
-V100/SM 7.0 and older devices and NVIDIA Linux drivers below 580.65.06 are
-prohibited by this CUDA 13 runtime contract.
+The active profile is `dpa4-alloytongqi-l20`. Read its image identity and
+qualification status from `data/dpa4_alloytongqi_l20_profile.json`; only
+`post_snapshot_passed` permits production generation. T4 is absent from the
+sandbox catalog checked on 2026-10-15. Historical T4 evidence and artifacts
+remain provenance and must not be reused as L20 qualification.
+
+The target is one L20 (SM 8.9), one MPI rank. Sandboxes use
+`c16_m120_1 * NVIDIA L20`; jobs use `1 * NVIDIA L20_48g`.
+4090 checkpoint inference is preliminary evidence, not production acceptance.
+Cross-family `.pt2` reuse, CPU production, multi-rank and multi-GPU are blocked.
 
 ## Agent workflow
 
 1. Retain `models/DPA4-alloytongqi/model.pt` as the source identity; do not pass
    it to LAMMPS.
 2. Inspect the candidate with `validate_apex_combo.py list-combos
-   --runtime-profile dpa4-alloytongqi-t4`.
+   --runtime-profile dpa4-alloytongqi-l20`.
 3. Stop while `recommend` and `generate_config.py create --runtime-profile
-   dpa4-alloytongqi-t4` fail closed. After exact-image qualification, use the
+   dpa4-alloytongqi-l20` fail closed. After exact-image qualification, use the
    generated image-resident `.pt2` contract and audited wrapper commands only.
    The exact wrappers are `/usr/local/bin/dpa4-lmp` and
    `/usr/local/bin/dpa4-phonolammps`.
