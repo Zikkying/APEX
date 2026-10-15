@@ -185,7 +185,7 @@ After publication, generate (do not hand-write) this image-resident contract:
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10,
+            "ftol": 1e-6,
             "maxiter": 5000,
             "maximal": 500000
         }

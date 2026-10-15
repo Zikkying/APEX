@@ -56,7 +56,7 @@ Direct
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10,
+            "ftol": 1e-6,
             "maxiter": 5000,
             "maximal": 500000
         }
@@ -255,7 +255,7 @@ apex rss rss.json
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10,
+            "ftol": 1e-6,
             "maxiter": 5000,
             "maximal": 500000
         }
@@ -285,7 +285,7 @@ apex rss rss.json
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10
+            "ftol": 1e-6
         }
     },
     "properties": [
@@ -403,7 +403,7 @@ python <skill-root>/scripts/list_bohrium_images.py --keyword vasp --require
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10
+            "ftol": 1e-6
         }
     },
     "properties": [
@@ -419,7 +419,7 @@ python <skill-root>/scripts/list_bohrium_images.py --keyword vasp --require
                 "relax_shape": false,
                 "relax_vol": false,
                 "etol": 0,
-                "ftol": 1e-10
+                "ftol": 1e-6
             }
         }
     ]
@@ -444,7 +444,7 @@ python <skill-root>/scripts/list_bohrium_images.py --keyword vasp --require
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10
+            "ftol": 1e-6
         }
     },
     "properties": [
@@ -460,7 +460,7 @@ python <skill-root>/scripts/list_bohrium_images.py --keyword vasp --require
                 "relax_shape": false,
                 "relax_vol": false,
                 "etol": 0,
-                "ftol": 1e-10
+                "ftol": 1e-6
             }
         }
     ]
@@ -485,7 +485,7 @@ python <skill-root>/scripts/list_bohrium_images.py --keyword vasp --require
     "relaxation": {
         "cal_setting": {
             "etol": 0,
-            "ftol": 1e-10
+            "ftol": 1e-6
         }
     },
     "properties": [

@@ -301,7 +301,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
         self.assertEqual(configs[0]["supercell_size"], [3, 3, 3])
 
     def test_build_param_json_uses_confirmed_property_configs_exactly(self):
-        confirmed = [{"type": "eos", "vol_step": 0.02}]
+        confirmed = [{"type": "eos", "vol_step": 0.02, "cal_setting": {"ftol": 2e-6}}]
         param = self.gen.build_param_json(
             "confs/input",
             {"type": "deepmd", "model": "model.pth"},
@@ -481,11 +481,11 @@ class TestGenerateConfigHelpers(unittest.TestCase):
     def test_build_param_json_flow_types_and_dft_overrides(self):
         lammps = {"type": "deepmd"}
         joint = self.gen.build_param_json(
-            "confs/input", lammps, ["elastic", "unknown"], "joint"
+            "confs/input", lammps, ["elastic"], "joint"
         )
         self.assertIn("relaxation", joint)
         self.assertEqual(joint["properties"], [
-            self.gen.PROPERTY_DEFAULTS["elastic"]
+            dict(self.gen.PROPERTY_DEFAULTS["elastic"], cal_setting={"ftol": 1e-6})
         ])
 
         relax = self.gen.build_param_json(
@@ -495,7 +495,7 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             "relax",
             relaxation_settings={"etol": 1},
         )
-        self.assertEqual(relax["relaxation"]["cal_setting"], {"etol": 1})
+        self.assertEqual(relax["relaxation"]["cal_setting"], {"etol": 1, "ftol": 1e-6})
         self.assertNotIn("properties", relax)
         self.assertEqual(
             self.gen.PROPERTY_DEFAULTS["gruneisen"]["MESH"],
@@ -518,11 +518,11 @@ class TestGenerateConfigHelpers(unittest.TestCase):
         )
         self.assertEqual(
             baseline["properties"][0],
-            self.gen.PROPERTY_DEFAULTS["gamma"],
+            dict(self.gen.PROPERTY_DEFAULTS["gamma"], cal_setting={"ftol": 1e-6}),
         )
         self.assertEqual(
             baseline["properties"][1],
-            self.gen.PROPERTY_DEFAULTS["gamma_surface"],
+            dict(self.gen.PROPERTY_DEFAULTS["gamma_surface"], cal_setting={"ftol": 1e-6}),
         )
 
         args = Namespace(
@@ -2224,3 +2224,28 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestLammpsAccuracyPolicy(unittest.TestCase):
+    def test_presets_reject_invalid_and_preserve_explicit(self):
+        gen = _load_script('generate_config.py')
+        self.assertEqual(gen.resolve_lammps_ftol(), 1e-6)
+        self.assertEqual(gen.resolve_lammps_ftol('screening'), 1e-4)
+        self.assertEqual(gen.resolve_lammps_ftol('screening', 2e-6), 2e-6)
+        for value in (0, -1, float('nan'), float('inf')):
+            with self.assertRaises(ValueError):
+                gen.resolve_lammps_ftol(ftol=value)
+        configs = [{'type': 'gamma', 'cal_setting': {'ftol': 3e-6}}, {'type': 'eos'}]
+        param = gen.build_param_json('confs/input', {'type': 'deepmd'}, ['gamma', 'eos'],
+                                     property_configs=configs, lammps_ftol=1e-4)
+        self.assertEqual(param['relaxation']['cal_setting']['ftol'], 1e-4)
+        self.assertEqual(param['properties'][0]['cal_setting']['ftol'], 3e-6)
+        self.assertEqual(param['properties'][1]['cal_setting']['ftol'], 1e-4)
+        self.assertNotIn('cal_setting', configs[1])
+        dft = gen.build_param_json('confs/input', {'type': 'vasp'}, ['eos'])
+        self.assertNotIn('ftol', dft['relaxation']['cal_setting'])
+        self.assertNotIn('ftol', dft['properties'][0].get('cal_setting', {}))
+
+    def test_unknown_property_is_not_silently_dropped(self):
+        gen = _load_script('generate_config.py')
+        with self.assertRaisesRegex(ValueError, 'Unknown property'):
+            gen.build_param_json('confs/input', {'type': 'deepmd'}, ['gamaa'])

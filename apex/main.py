@@ -219,7 +219,7 @@ def parse_args():
         "--id",
         type=str,
         default=None,
-        help="workflow ID to query",
+        help="step ID(s) to filter, comma-separated; positional ID is the workflow ID",
     )
     parser_getsteps.add_argument(
         "-w", "--work", type=str, default='.',

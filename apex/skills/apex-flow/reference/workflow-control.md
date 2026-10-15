@@ -38,6 +38,44 @@ Work from the outer job's submitted input directory and log.
 4. Confirm that `apex get` reports `Running` or `Pending` before describing the
    workflow as running.
 
+### Inspect failed steps without masking CLI errors
+
+`apex get` reports a workflow; it has no `--step` option. Discover supported
+arguments with `apex get --help` and `apex getsteps --help` in the active runtime
+before using an unfamiliar option. A parser error is a failed diagnostic query,
+not evidence about the calculation.
+
+Use the exact inner workflow ID and config from the submission:
+
+```bash
+apex getsteps '<workflow-id>' -c global.json --phase Failed,Error
+apex getsteps '<workflow-id>' -c global.json --id '<actual-step-id>'
+```
+
+The positional ID identifies the workflow. `getsteps --id` filters step IDs;
+`--key` filters returned step keys. Display names such as
+`RelaxLAMMPS-Cal(0:0)` are not step IDs. Prefer an ID/key returned by the query,
+and quote it rather than constructing escaped shell expressions.
+The step query reports metadata and available outputs, not necessarily the
+calculator stderr. Inspect the matching pod/dispatcher/LAMMPS logs before
+assigning a root cause; if those logs are unavailable, report the evidence gap.
+
+Preserve the producer exit status when shortening output. For Bash:
+
+```bash
+set -o pipefail
+apex getsteps '<workflow-id>' -c global.json --phase Failed,Error > step-query.log 2>&1
+query_rc=$?
+tail -n 80 step-query.log
+exit "$query_rc"
+```
+
+Keep the full log. Do not treat an exit code from `tail`, `tee`, `grep`, or a
+following command as proof that the APEX query succeeded. After `unrecognized
+arguments`, correct the command from `--help`; do not repeat it or report the
+query as successful. Do not submit a replacement calculation merely because a
+diagnostic command failed.
+
 ### 2. Count relaxation and property tasks
 
 In the `getsteps` output, classify only the top-level task rows:

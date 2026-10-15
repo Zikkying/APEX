@@ -1333,12 +1333,36 @@ def plan_structure_layout(sources: list) -> list:
     return layout
 
 
+LAMMPS_ACCURACY = {"screening": 1e-4, "balanced": 1e-5, "precise": 1e-6}
+
+
+def resolve_lammps_ftol(accuracy="precise", ftol=None):
+    import math
+    value = LAMMPS_ACCURACY[accuracy] if ftol is None else float(ftol)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("ftol must be finite and positive")
+    if value < 1e-6 or value > 1e-4:
+        print("Warning: ftol outside recommended 1e-6..1e-4; preserve the explicit "
+              "choice and verify convergence using LAMMPS logs.", file=sys.stderr)
+    return value
+
+
+def apply_lammps_accuracy(param, ftol):
+    """Fill missing tolerances; preserve explicitly approved per-task settings."""
+    if param["interaction"]["type"] in ("vasp", "abacus"):
+        return param
+    for task in ([param["relaxation"]] if "relaxation" in param else []) + param.get("properties", []):
+        task.setdefault("cal_setting", {}).setdefault("ftol", ftol)
+    return param
+
+
 def build_param_json(structure_paths, interaction: dict,
                      properties: list, flow_type: str = "joint",
                      relaxation_settings: dict = None,
                      gamma_overrides: dict = None,
                      property_configs: list = None,
-                     melting_overrides: dict = None) -> dict:
+                     melting_overrides: dict = None,
+                     lammps_ftol: float = 1e-6) -> dict:
     """Build param.json configuration.
 
     structure_paths: one path string or a list of path strings for `structures`.
@@ -1370,7 +1394,7 @@ def build_param_json(structure_paths, interaction: dict,
                 param["relaxation"] = {
                     "cal_setting": {
                         "etol": 0,
-                        "ftol": 1e-10,
+                        "ftol": lammps_ftol,
                         "maxiter": 5000,
                         "maximal": 500000,
                     }
@@ -1380,7 +1404,7 @@ def build_param_json(structure_paths, interaction: dict,
     if flow_type in ("joint", "props"):
         if property_configs is not None:
             param["properties"] = copy.deepcopy(property_configs)
-            return param
+            return apply_lammps_accuracy(param, lammps_ftol)
         prop_configs = []
         is_dft = interaction.get("type") in ("abacus", "vasp")
         for prop_name in properties:
@@ -1400,11 +1424,10 @@ def build_param_json(structure_paths, interaction: dict,
                     cal_setting.update(copy.deepcopy(melting_overrides))
                 prop_configs.append(prop_config)
             else:
-                print(f"Warning: Unknown property '{prop_name}', skipping",
-                      file=sys.stderr)
+                raise ValueError(f"Unknown property: {prop_name}")
         param["properties"] = prop_configs
 
-    return param
+    return apply_lammps_accuracy(param, lammps_ftol)
 
 
 def load_confirmed_property_configs(path: str, requested: list) -> list:
@@ -1786,6 +1809,11 @@ def main():
     create.add_argument("--backend", "-b", required=True,
                         choices=["lammps", "abacus", "vasp"],
                         help="Calculator backend")
+    create.add_argument("--accuracy", choices=list(LAMMPS_ACCURACY), default="precise",
+                        help="LAMMPS: screening=1e-4, balanced=1e-5, precise=1e-6 (default)")
+    create.add_argument("--ftol", type=float,
+                        help="Explicit positive LAMMPS force tolerance; overrides accuracy preset")
+    subparsers.add_parser("describe-parameters", help="Show parameter guidance without credentials")
     create.add_argument("--potential", "-p",
                         help="LAMMPS potential type (deepmd/mace/nep/eam_alloy/...)")
     create.add_argument("--model", "-m",
@@ -1967,6 +1995,24 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.command == "describe-parameters":
+        print(json.dumps({"lammps_accuracy": LAMMPS_ACCURACY, "default": "precise",
+                          "properties": sorted(PROPERTY_DEFAULTS),
+                          "precedence": "explicit property cal_setting > --ftol > --accuracy",
+                          "validation": "Run validate_inputs.py --param param.json --global global.json inside the generated job directory.",
+                          "diagnosis": "Running is not convergence evidence; inspect LAMMPS steps, forces, stopping criterion and timestamps."}, indent=2))
+        return
+    if args.command == "create":
+        unknown = set(args.properties) - set(PROPERTY_DEFAULTS)
+        if unknown:
+            parser.error("Unknown properties: " + ", ".join(sorted(unknown)))
+        if args.backend != "lammps" and (args.ftol is not None or args.accuracy != "precise"):
+            parser.error("--accuracy/--ftol apply only to LAMMPS")
+        try:
+            selected_ftol = resolve_lammps_ftol(args.accuracy, args.ftol)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     if args.command == "refresh-global":
         try:
@@ -2281,6 +2327,7 @@ mixing_beta         0.7
         gamma_overrides=gamma_overrides,
         property_configs=confirmed_property_configs,
         melting_overrides=melting_overrides,
+        lammps_ftol=selected_ftol,
     )
 
     # -------------------------------------------------------------------------
@@ -2361,6 +2408,8 @@ mixing_beta         0.7
     print(f"APEX Job Configuration Generated")
     print(f"{'='*60}")
     print(f"Backend:        {args.backend}")
+    if args.backend == "lammps":
+        print("Effective convergence settings: " + json.dumps({"relaxation": param_config.get("relaxation"), "properties": [{"type": p["type"], "cal_setting": p.get("cal_setting", {})} for p in param_config.get("properties", [])]}))
     if args.potential:
         print(f"Potential:      {args.potential}")
     print(f"Structures:     {len(structure_paths)} ({', '.join(structure_paths)})")

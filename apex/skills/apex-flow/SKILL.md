@@ -130,7 +130,10 @@ Options to offer via AskQuestion:
    `apex submit` and report it to the user. Keep this ID available for all later
    monitoring, retrieval, and workflow-control actions. In Cloud/MatMaster,
    do not confuse it with the outer Bohrium job ID. Follow the exact status-query and reporting
-   protocol in `reference/workflow-control.md`; never infer workflow identity
+   protocol in `reference/workflow-control.md`. Query failed steps with
+   `apex getsteps <workflow-id> -c global.json --phase Failed,Error`;
+   `apex get --step` is invalid. Preserve the APEX exit code when truncating
+   logs, and never infer workflow identity
    or material identity from the outer job name alone. Use the returned
    workflow/step phases and durations to track progress. In the Cloud/MatMaster
    profile, also retain the outer job ID; do not invent one for direct mode. A
@@ -139,6 +142,28 @@ Options to offer via AskQuestion:
    `Succeeded`, verify that automatic result retrieval completed as described
    in `reference/submission.md`.
 4. **Kill = inner workflow first.** Terminate the inner dflow workflow before stopping any Cloud/MatMaster outer Bohrium node; otherwise compute can continue silently. Bohrium-direct has no outer node. See `reference/workflow-control.md`.
+### LAMMPS convergence and parameter generation
+
+Use `generate_config.py describe-parameters` to inspect supported properties and
+accuracy presets without credentials. For `create`, choose `--accuracy screening`
+(`ftol=1e-4`) for initial screening, `balanced` (`1e-5`) for intermediate work,
+or `precise` (`1e-6`, default) for tighter checks. Agents may choose within this
+range based on the task; disclose the choice with the property configuration.
+Use `--ftol VALUE` for a deliberate override. Explicit per-property
+`cal_setting.ftol` in `--property-config` takes precedence and is preserved.
+These are LAMMPS minimizer tolerances, not guaranteed scientific error bounds.
+For small energy differences, compare results at tighter tolerance before
+claiming precision. DFT SCF/ionic tolerances are separate.
+
+Inspect the effective settings printed by the generator, then run
+`validate_inputs.py --param param.json --global global.json` in the job directory.
+Do not hand-edit generated model paths. An unknown property is an input error.
+A long `Running` phase alone proves neither progress nor slow convergence:
+read the calculator log, iteration/force history, stopping criterion and latest
+output timestamps. Check dispatch, model loading and GPU execution before
+attributing a stall to `ftol`. Model prediction error is not a measured numerical
+noise floor. Do not give completion-time estimates without throughput evidence.
+
 5. **Cloud/MatMaster MUST use `generate_config.py`; never hand-write `param.json` or `global.json`.** Installed local editions follow their selected profile and audited templates.
   - Create the complete job with `python <skill-root>/scripts/generate_config.py create ...`.
   - For multiple structures, pass repeated/space-separated `--structure` and/or `--structure-dir` to `create` (it copies each into `confs/<name>/` and fills `structures`); do not hand-edit `structures` after create.
@@ -398,7 +423,7 @@ Options to offer via AskQuestion:
         "type_map": "auto"
     },
     "relaxation": {
-        "cal_setting": {"etol": 0, "ftol": 1e-10, "maxiter": 5000, "maximal": 500000}
+        "cal_setting": {"etol": 0, "ftol": 1e-6, "maxiter": 5000, "maximal": 500000}
     },
     "properties": [
         {"type": "eos", "vol_start": 0.8, "vol_end": 1.2, "vol_step": 0.05},

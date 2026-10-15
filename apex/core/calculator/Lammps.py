@@ -289,7 +289,7 @@ class Lammps(Task):
         prop_type = task_param.get("type", "relaxation")
 
         etol = cal_setting.get("etol", 0)
-        ftol = cal_setting.get("ftol", 1e-10)
+        ftol = cal_setting.get("ftol", 1e-6)
         maxiter = cal_setting.get("maxiter", 5000)
         maxeval = cal_setting.get("maxeval", 500000)
         B0 = 70
