@@ -51,8 +51,8 @@ class TestAccountConfig(unittest.TestCase):
     def test_config_default_lammps_image_is_cpu_safe_runtime(self):
         self.assertEqual(
             Config().lammps_image_name,
-            "registry.dp.tech/dptech/dp/native/prod-397637/"
-            "apex-flow:1.3.0.post",
+            "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+            "apex-flow-cpu:1.3.4-20261016",
         )
 
     def test_openapi_default_gpu_machine_is_l20(self):

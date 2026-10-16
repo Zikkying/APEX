@@ -1,0 +1,10 @@
+FROM registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1
+# Reuse the existing project virtualenv; never install into system Python.
+RUN test -x /opt/apex-venv/bin/python \
+ && /opt/apex-venv/bin/python -m pip install --no-cache-dir --upgrade --no-deps --timeout 60 --retries 2 https://codeload.github.com/Zikkying/APEX/tar.gz/cf70c9cfc8acc806111a65919ea3c80266886e1a \
+ && /opt/apex-venv/bin/python -c 'import apex; assert apex.__version__ == "1.3.4"'
+RUN apt-get update && apt-get install -y --no-install-recommends lammps \
+ && rm -rf /var/lib/apt/lists/* \
+ && /usr/bin/lmp -h | grep -q 'eam/alloy'
+ENV PATH=/opt/apex-venv/bin:/usr/local/bin:/usr/bin:/bin OMP_NUM_THREADS=1
+RUN python -m apex --help >/dev/null && python -c 'import numpy,monty,pymatgen,dpdata,dflow,dpdispatcher'
