@@ -238,6 +238,17 @@ def select_lammps_image(potential: str = None) -> str:
     return LAMMPS_CPU_IMAGE
 
 
+def default_phonolammps_command(image):
+    executables = {
+        LAMMPS_CPU_IMAGE: "/opt/apex-venv/bin/phonolammps",
+        LAMMPS_GPU_IMAGE: "/opt/deepmd-kit-3.1.3/bin/phonolammps",
+    }
+    executable = executables.get(image)
+    if executable:
+        return executable + " {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+    return None
+
+
 # scass_type defaults for inner dflow containers (legacy Bohrium)
 SCASS_TYPES = {
     "lammps_gpu": "1 * NVIDIA L20_48g",
@@ -706,6 +717,10 @@ def build_global_json(backend: str, potential: str = None,
         "group_size": 1,
         "pool_size": 1,
     }
+    if backend == "lammps" and dpa4_profile is None:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
     if dpa4_profile is not None:
         config["phonolammps_run_command"] = dpa4_profile["calculator"][
             "phonolammps_command"
@@ -847,6 +862,10 @@ def build_global_json_sandbox(backend: str, potential: str = None,
         config["dispatcher_remote_command"] = ("/usr/local/bin/apex-calculator-python" if potential in GPU_POTENTIALS else "/opt/apex-venv/bin/python")
         config["ignore_exit_code"] = False
 
+    if backend == "lammps" and not profile:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
     if profile:
         config["phonolammps_run_command"] = profile["calculator"]["phonolammps_command"]
         config["ignore_exit_code"] = False

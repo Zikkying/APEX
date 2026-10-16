@@ -583,3 +583,5 @@ successful calculations rather than resubmitting an entire workflow.
 
 For a new MLIP/geometry combination, run its actual zero-displacement gamma
 slab first. A small periodic-cell relaxation does not validate a larger slab.
+
+For phonon/Gruneisen, retain the generated absolute `phonolammps_run_command`: CPU uses `/opt/apex-venv/bin/phonolammps`, general DeePMD uses `/opt/deepmd-kit-3.1.3/bin/phonolammps`. Preserve `{input_file}`, `{poscar}`, `{dim}` and `{primitive_axes}`. Sandbox login shells reset PATH; a bare `phonolammps` command is not a valid substitute. Tongqi keeps its dedicated wrapper.

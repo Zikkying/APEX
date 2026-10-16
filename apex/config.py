@@ -340,6 +340,15 @@ class Config:
 
     @property
     def basic_config_dict(self):
+        phonolammps_command = self.phonolammps_run_command
+        if not phonolammps_command:
+            executables = {
+                "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline": "/opt/apex-venv/bin/phonolammps",
+                "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016": "/opt/deepmd-kit-3.1.3/bin/phonolammps",
+            }
+            executable = executables.get(self.lammps_image_name)
+            if executable:
+                phonolammps_command = executable + " {input_file} -c {poscar} --dim {dim} {primitive_axes}"
         basic_config = {
             "run_image_name": self.run_image_name,
             "run_command": self.run_command,
@@ -349,7 +358,7 @@ class Config:
             "upload_python_packages": self.upload_python_packages,
             "lammps_image_name": self.lammps_image_name,
             "lammps_run_command": self.lammps_run_command,
-            "phonolammps_run_command": self.phonolammps_run_command,
+            "phonolammps_run_command": phonolammps_command,
             "vasp_image_name": self.vasp_image_name,
             "vasp_run_command": self.vasp_run_command,
             "abacus_image_name": self.abacus_image_name,

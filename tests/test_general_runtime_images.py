@@ -29,6 +29,21 @@ class RuntimeSelectionTests(unittest.TestCase):
                 self.assertFalse(cfg['ignore_exit_code'])
                 self.assertEqual(cfg['image_address'], cfg['lammps_image_name'])
 
+    def test_phonon_commands_survive_sandbox_path_reset(self):
+        from apex.config import Config
+        generator = load('generate_config')
+        for potential, image, executable in [
+            ('eam_alloy', generator.LAMMPS_CPU_IMAGE, '/opt/apex-venv/bin/phonolammps'),
+            ('deepmd', generator.LAMMPS_GPU_IMAGE, '/opt/deepmd-kit-3.1.3/bin/phonolammps'),
+        ]:
+            cfg = generator.build_global_json_sandbox('lammps', potential=potential,
+                access_key='test', project_id=397953)
+            command = cfg['phonolammps_run_command']
+            self.assertTrue(command.startswith(executable + ' '))
+            self.assertIn('{primitive_axes}', command)
+            self.assertEqual(Config(lammps_image_name=image).basic_config_dict['phonolammps_run_command'], command)
+        self.assertIsNone(Config(lammps_image_name='custom:lammps').basic_config_dict['phonolammps_run_command'])
+
     def test_generic_image_rejects_cpu_and_unqualified_gpu(self):
         validator = load('validate_apex_combo')
         for machine in ['c1_m2_cpu', 'c8_m31_1 * NVIDIA T4', 'c8_m32_1 * NVIDIA 4090']:
