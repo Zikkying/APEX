@@ -1,0 +1,8 @@
+FROM registry.dp.tech/dptech/dp/native/prod-397637/deepmd-kit-phonolammps:3.1.3
+# Keep the existing scientific environment and both compiled inference backends.
+ENV PATH=/opt/deepmd-kit-3.1.3/bin:/usr/local/bin:/usr/bin:/bin \
+    OMP_NUM_THREADS=1 DP_INTRA_OP_PARALLELISM_THREADS=1 DP_INTER_OP_PARALLELISM_THREADS=1
+RUN printf '#!/bin/sh\nexec /opt/deepmd-kit-3.1.3/bin/python "$@"\n' > /usr/local/bin/apex-calculator-python \
+ && printf '#!/bin/sh\nexec /opt/deepmd-kit-3.1.3/bin/lmp "$@"\n' > /usr/local/bin/apex-lmp \
+ && chmod 755 /usr/local/bin/apex-calculator-python /usr/local/bin/apex-lmp \
+ && /usr/local/bin/apex-calculator-python -c 'import numpy,monty,ruamel.yaml,deepmd,torch,tensorflow,phonolammps; print(deepmd.__version__,torch.__version__,tensorflow.__version__)'

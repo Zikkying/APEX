@@ -25,7 +25,7 @@ at `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
 Use the profile's wrappers and model hashes. This release is enabled, with
 full image benchmark pending; OpenAPI static make/run/post/retrieval acceptance passed.
 
-The `dpa4-phonolammps:0.0.2` references below describe the generic GPU/base
+The `apex-deepmd-gpu:3.1.3-20261016` references below describe the generic DeePMD
 image, not the bundled alloytongqi deployment. Do not switch a tongqi job to
 that base image, a different checkpoint, or CPU to recover a failed submission.
 DPA4-Neo-OMat24 is a different model; its release date or element count does
@@ -257,21 +257,19 @@ manual map.
 
 | Potential Type | Recommended Image | GPU? |
 |---------------|-------------------|------|
-| deepmd | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
-| mace | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
-| nep | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | Yes (NVIDIA L20 default; RTX 4090 compatible) |
-| DPA4 alloytongqi candidate | Locked `dpa4-alloytongqi-l20` profile; no published image yet | One L20 only after exact-image qualification |
-| gap | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No (CPU) |
-| snap | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
-| rann | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
-| eam_alloy | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
-| eam_fs | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
-| meam | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
-| meam_spline | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | No |
+| deepmd | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016` | Yes (NVIDIA L20; DeePMD TensorFlow/PyTorch only) |
+| mace | Explicitly validated custom image required | Model-specific |
+| nep | Explicitly validated custom image required | Model-specific |
+| DPA4 alloytongqi | Published `dpa4-alloytongqi-l20` profile; use its pinned image and wrappers | One qualified L20 |
+| gap | Explicitly validated custom image required | Model-specific |
+| snap | Explicitly validated custom image required | CPU |
+| rann | Explicitly validated custom image required | Model-specific |
+| eam_alloy | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| eam_fs | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| meam | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| meam_spline | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
 
-GPU and CPU potentials use separate images. The DPA4 image is not a CPU
-fallback: sequential `c8_m32_cpu` validation stalled during container
-preparation. Standard CPU potentials use the APEX 1.3.0 image.
+GPU and CPU calculators use separate images. Standard CPU calculations use the APEX/CPU image above.
 The table records APEX defaults, not compatibility with every model format.
 The old tag's
 Bohrium registry mirror at repo digest
@@ -297,3 +295,27 @@ Other potential types also require their own compatible model files.
 | `model file not found` | File not in job directory | Ensure model file is copied to submission dir |
 | `GPU not available` | Running GPU potential on CPU node | Switch to GPU machine type |
 | `segfault in mace` | Domain decomposition issue | `no_domain_decomposition` is already set by APEX |
+
+## Runtime selection and success checks (2026-10-16)
+
+Use the images and absolute executable paths emitted by `generate_config.py`.
+The APEX/CPU image preinstalls APEX 1.3.4 in `/opt/apex-venv` and runs classical
+LAMMPS through `/usr/bin/lmp`. The general DeePMD GPU image uses
+`/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on L20.
+It supports the tested TensorFlow .pb and DPA-3.2 PyTorch .pth cases; this is
+not qualification for every model, MACE, NEP, or another GPU. Tongqi retains
+its separate pinned L20 profile and wrappers.
+
+Do not copy image or machine settings from old job folders. Generate fresh
+configuration, record the loaded skill revision, actual APEX version, image,
+model hash, GPU/CPU receipt, and command. Do not infer calculator success from
+a Bohrium Finished status or a green dflow step. Inspect each task's
+`apex_task_status.json`, exit code, and finite energy output. A failed gamma
+zero-displacement reference is a calculator failure, not evidence of a
+post-processing defect. Retrieve the original error before retrying; reuse
+successful calculations rather than resubmitting an entire workflow.
+
+For a new MLIP/geometry combination, run its actual zero-displacement gamma
+slab first. A small periodic-cell relaxation does not validate a larger slab.
+
+For phonon/Gruneisen, retain the generated absolute `phonolammps_run_command`: CPU uses `/opt/apex-venv/bin/phonolammps`, general DeePMD uses `/opt/deepmd-kit-3.1.3/bin/phonolammps`. Preserve `{input_file}`, `{poscar}`, `{dim}` and `{primitive_axes}`. Sandbox login shells reset PATH; a bare `phonolammps` command is not a valid substitute. Tongqi keeps its dedicated wrapper.

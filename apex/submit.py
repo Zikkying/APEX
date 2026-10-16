@@ -36,8 +36,8 @@ from apex.utils import (
 
 
 LAMMPS_PHONON_IMAGE = (
-    "registry.dp.tech/dptech/dp/native/prod-16664/"
-    "dpa4-phonolammps:0.0.2"
+    "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+    "apex-deepmd-gpu:3.1.3-20261016"
 )
 GPU_LAMMPS_INTERACTIONS = {"deepmd", "mace", "nep"}
 
@@ -496,30 +496,9 @@ def _select_run_image(
                 expected_image,
             )
         return expected_image
-    interaction = (props_param or {}).get("interaction", {})
-    interaction_type = (
-        interaction.get("type") if isinstance(interaction, dict) else None
-    )
-    is_cpu_machine = "_cpu" in str(machine_type or "").lower()
-    if (
-        calculator == "lammps"
-        and interaction_type in GPU_LAMMPS_INTERACTIONS
-        and not is_cpu_machine
-        and props_param
-        and any(
-            prop.get("type") in {"phonon", "gruneisen"}
-            for prop in props_param.get("properties", [])
-        )
-    ):
-        if run_image != LAMMPS_PHONON_IMAGE:
-            logging.warning(
-                "GPU LAMMPS phonon/Gruneisen requires the validated "
-                "phonoLAMMPS image; "
-                "overriding run image %r with %r.",
-                run_image,
-                LAMMPS_PHONON_IMAGE,
-            )
-        return LAMMPS_PHONON_IMAGE
+    # The configured runtime owns its model backend and entrypoints. Silently
+    # swapping an image for phonons can select an inaccessible project image
+    # or an incompatible model loader. Dedicated PT2 contracts are handled above.
     return run_image
 
 

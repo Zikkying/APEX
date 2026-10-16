@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-16",
+  "project_id": 397953,
+  "gpu": {
+    "image": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+    "digest": "sha256:0c761010974c96b7704ce48add4fe7f98a447fd387184051ec85039840fcd646",
+    "build_id": 179011,
+    "sandbox_id": "default--scicomp-l20-tmzjjo-xssdq",
+    "machine": "c16_m120_1 * NVIDIA L20",
+    "status": "runtime_passed",
+    "cases": [
+      {
+        "name": "TensorFlow Al 32 atoms run 0",
+        "exit_code": 0,
+        "energy_ev": -59.919936
+      },
+      {
+        "name": "DPA-3.2 PyTorch Al 32 atoms run 0",
+        "exit_code": 0,
+        "energy_ev": -120.01878
+      },
+      {
+        "name": "DPA-3.2 Ni 540 atom gamma reference",
+        "exit_code": 0,
+        "final_energy_ev": -2910.00970768929,
+        "wall_seconds": 37,
+        "minimization_stopping_criterion": "linesearch alpha is zero",
+        "force_converged": false
+      }
+    ],
+    "scope": "Fresh-image L20 calculator tests plus APEX/OpenAPI static make/run/post/retrieval; not universal model/GPU or scientific convergence qualification",
+    "input_sha256": {
+      "tf_model": "a75cb7b7f9c205aca57d5f9562ff8e1ef9d61c90dae877a2a4c9b31fde22cc32",
+      "pt_model": "055fbbcb83c9063f7809a74803c600eb34cf0b3f7caf15e0e0d2b86834f30e8e",
+      "ni540_structure": "8a81b92fb2ed5dabff6ce9542c78cedd5998ecd5dbad2208fd82b92628a12d7f"
+    },
+    "log_sha256": {
+      "deepmd_tf": "98e7fe7e02bb0900488c6f7bf0f04cc1ef3d22eff227d5f52df4951c38226f95",
+      "deepmd_pt": "f0d4dc6fff663d5430f6dc966ff9e002523d506fa06ffd7f54ea6b7d1b59b067",
+      "ni540": "694693ce63887bb4b15ace0b913af9c9b235b97fa32d5823ae397e5c82e9d487"
+    },
+    "native_job_attempt": {
+      "bohr_id": 20904086,
+      "status": "cancelled_after_resource_rescheduling",
+      "calculator_acceptance": false
+    },
+    "openapi_workflow": {
+      "workflow": "apex-deepmd-runtime-20261016-relax-7hp89",
+      "phase": "Succeeded",
+      "retrieved": true,
+      "archive": true,
+      "task_statuses": [
+        "succeeded"
+      ],
+      "inner_job": {
+        "jobId": "6a1e08c8abb64aeaa0f1e9536849d40a",
+        "status": 2,
+        "statusReason": "job_succeeded",
+        "spendTime": 40,
+        "errorMessage": "",
+        "machineType": "c16_m120_1 * NVIDIA L20",
+        "imageName": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+        "exitCode": 0
+      }
+    },
+    "phonolammps_run_command": "/opt/deepmd-kit-3.1.3/bin/phonolammps {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+  },
+  "cpu": {
+    "image": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
+    "catalog_image_id": 179038,
+    "version": "1.3.4",
+    "source_commit": "ce5b1d1bf133b335dcebd131e22752067979e3f1",
+    "runtime_wheel_sha256": "6ba57e9ddc724faf3a57cfade78ad17fec355187823f53740bb68072aa7b38b1",
+    "sandbox_id": "default--d-image-replace-c4-m8-tmzkgi-ljdj5",
+    "machine": "c4_m8_cpu",
+    "status": "fresh_image_runtime_passed",
+    "cases": [
+      {
+        "name": "Al EAM relaxation and four-point (111)[11-2] gamma line",
+        "exit_code": 0,
+        "gamma_j_m2": [
+          0.0,
+          0.5335258684441107,
+          0.015185347376445611,
+          0.0
+        ]
+      },
+      {
+        "name": "Al EAM 1x1x1 phonon make/run/post",
+        "exit_code": 0,
+        "band_result_finite": true
+      }
+    ],
+    "packages": {
+      "apex-flow": "1.3.4",
+      "numpy": "1.26.4",
+      "phonopy": "4.3.1",
+      "phonolammps": "0.10.1",
+      "dynaphopy": "1.18.0",
+      "lammps": "20250204"
+    },
+    "installed_classical_styles": [
+      "eam/alloy",
+      "eam/fs",
+      "meam",
+      "meam/spline"
+    ],
+    "custom_runtime_required": [
+      "snap",
+      "gap",
+      "rann",
+      "mace",
+      "nep"
+    ],
+    "result_sha256": {
+      "gamma_00": "049c541c8412a9833709324b918425368ee638ad667e93ac3189afa7577b5876",
+      "phonon_00": "aef5c2947998f51e881b2576974e7949ecdd3551c3ffcb184cc9ebef9bae0e21"
+    },
+    "openapi_relax_job": {
+      "jobId": "6b697a4746ed4b3683cd24b2883a358c",
+      "status": 2,
+      "statusReason": "job_succeeded",
+      "spendTime": 19,
+      "errorMessage": "",
+      "machineType": "c8_m32_cpu",
+      "imageName": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
+      "exitCode": 0
+    },
+    "scope": "Fresh-image small-cell gamma and phonon runtime plus APEX/OpenAPI joint gamma make/run/post/retrieval; not a supercell/convergence or full property benchmark",
+    "openapi_workflow": {
+      "workflow": "apex-cpu-runtime-20261016-joint-7cqgt",
+      "phase": "Succeeded",
+      "retrieved": true,
+      "archive": true,
+      "task_statuses": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ],
+      "gamma_j_m2": [
+        0.0,
+        0.5335258684441107,
+        0.015185347376445611,
+        0.0
+      ]
+    },
+    "phonolammps_run_command": "/opt/apex-venv/bin/phonolammps {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+  }
+}

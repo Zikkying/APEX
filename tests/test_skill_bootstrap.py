@@ -14,7 +14,7 @@ spec.loader.exec_module(bootstrap)
 
 class TestImageRuntimeBootstrap(unittest.TestCase):
     def test_usable_current_or_newer_image_does_not_install(self):
-        for version in ("1.3.3", "1.3.3.post1", "1.4.0"):
+        for version in ("1.3.4", "1.3.4.post1", "1.4.0"):
             with self.subTest(version=version), patch.object(
                 bootstrap.metadata, "version", return_value=version
             ), patch.object(bootstrap.subprocess, "run") as run:
@@ -24,21 +24,18 @@ class TestImageRuntimeBootstrap(unittest.TestCase):
                 self.assertIn([sys.executable, "-m", "apex", "--help"], commands)
                 self.assertTrue(all(cmd[0] == sys.executable for cmd in commands))
 
-    def test_missing_old_or_prerelease_installs_only_pinned_release(self):
-        for version in (None, "1.3.1", "1.3.2.post1", "1.3.3rc1"):
+    def test_missing_old_or_prerelease_fails_without_install(self):
+        for version in (None, "1.3.1", "1.3.2.post1", "1.3.4rc1"):
             with self.subTest(version=version), patch.object(
                 bootstrap.metadata, "version", return_value=version,
                 side_effect=bootstrap.metadata.PackageNotFoundError if version is None else None,
             ), patch.object(bootstrap.subprocess, "run") as run:
-                bootstrap.ensure_apex()
-                install = run.call_args_list[0].args[0]
-                self.assertEqual(install[:4], [sys.executable, "-m", "pip", "install"])
-                self.assertIn(bootstrap.BOOTSTRAP_SOURCE, install)
-                self.assertRegex(bootstrap.BOOTSTRAP_SOURCE, r"/archive/[0-9a-f]{40}\.tar\.gz$")
-                self.assertNotIn("--upgrade", install)
+                with self.assertRaisesRegex(RuntimeError, "prebuilt APEX"):
+                    bootstrap.ensure_apex()
+                run.assert_not_called()
 
     def test_broken_cli_fails_without_silent_reinstallation(self):
-        with patch.object(bootstrap.metadata, "version", return_value="1.3.3"), patch.object(
+        with patch.object(bootstrap.metadata, "version", return_value="1.3.4"), patch.object(
             bootstrap.subprocess, "run", side_effect=[
                 subprocess.CompletedProcess([], 0), subprocess.CalledProcessError(1, "apex")
             ]
@@ -47,10 +44,3 @@ class TestImageRuntimeBootstrap(unittest.TestCase):
                 bootstrap.ensure_apex()
             self.assertEqual(run.call_count, 2)
 
-    def test_failed_bootstrap_does_not_continue_to_submit(self):
-        with patch.object(bootstrap.metadata, "version", return_value="1.3.1"), patch.object(
-            bootstrap.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "pip")
-        ) as run:
-            with self.assertRaises(subprocess.CalledProcessError):
-                bootstrap.ensure_apex()
-            self.assertEqual(run.call_count, 1)

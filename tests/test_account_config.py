@@ -48,11 +48,16 @@ class TestAccountConfig(unittest.TestCase):
             "c16_m120_1 * NVIDIA L20",
         )
 
+    def test_account_defaults_match_current_workflow_image(self):
+        from apex.account import DEFAULT_BOHRIUM_CONFIG, DEFAULT_OPENAPI_CONFIG
+        for defaults in [DEFAULT_BOHRIUM_CONFIG, DEFAULT_OPENAPI_CONFIG]:
+            self.assertEqual(defaults["apex_image_name"], Config().apex_image_name)
+
     def test_config_default_lammps_image_is_cpu_safe_runtime(self):
         self.assertEqual(
             Config().lammps_image_name,
-            "registry.dp.tech/dptech/dp/native/prod-397637/"
-            "apex-flow:1.3.0.post",
+            "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+            "apex-flow-cpu:1.3.4-20261016-offline",
         )
 
     def test_openapi_default_gpu_machine_is_l20(self):

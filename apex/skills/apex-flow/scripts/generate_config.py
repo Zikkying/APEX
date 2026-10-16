@@ -55,12 +55,9 @@ SANDBOX_DFLOW_HOST = "https://lbg-workflow-dflow.dp.tech"
 SANDBOX_DISPATCHER_IMAGE = (
     "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811"
 )
-APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1"
-LAMMPS_GPU_IMAGE = (
-    "registry.dp.tech/dptech/dp/native/prod-16664/"
-    "dpa4-phonolammps:0.0.2"
-)
-LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post"
+APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
+LAMMPS_GPU_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016'
+LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
 # Backward-compatible alias used by external callers and older tests. New code
 # must select LAMMPS_GPU_IMAGE or LAMMPS_CPU_IMAGE from the potential type.
 LAMMPS_IMAGE = LAMMPS_GPU_IMAGE
@@ -234,9 +231,22 @@ GPU_POTENTIALS = {"deepmd", "mace", "nep"}
 
 def select_lammps_image(potential: str = None) -> str:
     """Return the validated LAMMPS image for a potential's resource class."""
-    if potential in GPU_POTENTIALS:
+    if potential in {"mace", "nep", "gap", "rann", "snap"}:
+        raise ValueError("MACE/NEP/GAP/RANN/SNAP require an explicitly validated custom image; default images do not qualify these pair styles")
+    if potential == "deepmd":
         return LAMMPS_GPU_IMAGE
     return LAMMPS_CPU_IMAGE
+
+
+def default_phonolammps_command(image):
+    executables = {
+        LAMMPS_CPU_IMAGE: "/opt/apex-venv/bin/phonolammps",
+        LAMMPS_GPU_IMAGE: "/opt/deepmd-kit-3.1.3/bin/phonolammps",
+    }
+    executable = executables.get(image)
+    if executable:
+        return executable + " {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+    return None
 
 
 # scass_type defaults for inner dflow containers (legacy Bohrium)
@@ -659,7 +669,7 @@ def build_global_json(backend: str, potential: str = None,
     elif run_command:
         calc_run_command = run_command
     elif backend == "lammps":
-        calc_run_command = "lmp -in in.lammps"
+        calc_run_command = ("lmp -in in.lammps" if lammps_image else "/usr/local/bin/apex-lmp -in in.lammps" if potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
     elif backend == "abacus":
         calc_run_command = "mpirun -n 16 abacus"
     elif backend == "vasp":
@@ -707,6 +717,10 @@ def build_global_json(backend: str, potential: str = None,
         "group_size": 1,
         "pool_size": 1,
     }
+    if backend == "lammps" and dpa4_profile is None:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
     if dpa4_profile is not None:
         config["phonolammps_run_command"] = dpa4_profile["calculator"][
             "phonolammps_command"
@@ -786,7 +800,7 @@ def build_global_json_sandbox(backend: str, potential: str = None,
     if run_command:
         calc_run_command = run_command
     elif backend == "lammps":
-        calc_run_command = "lmp -in in.lammps"
+        calc_run_command = ("lmp -in in.lammps" if lammps_image else "/usr/local/bin/apex-lmp -in in.lammps" if potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
     elif backend == "abacus":
         calc_run_command = "mpirun -n 8 abacus"
     elif backend == "vasp":
@@ -844,6 +858,14 @@ def build_global_json_sandbox(backend: str, potential: str = None,
         if vasp_image:
             config["vasp_image_name"] = vasp_image.strip()
 
+    if backend == "lammps" and not profile and not lammps_image:
+        config["dispatcher_remote_command"] = ("/usr/local/bin/apex-calculator-python" if potential in GPU_POTENTIALS else "/opt/apex-venv/bin/python")
+        config["ignore_exit_code"] = False
+
+    if backend == "lammps" and not profile:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
     if profile:
         config["phonolammps_run_command"] = profile["calculator"]["phonolammps_command"]
         config["ignore_exit_code"] = False

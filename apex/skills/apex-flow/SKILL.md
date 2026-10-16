@@ -1,23 +1,8 @@
 ---
-
-## Qualified OpenAPI submission
-
-`--runtime-profile dpa4-alloytongqi-l20 --sandbox` is enabled for the pinned
-slim02 image and `machine_type: c16_m120_1 * NVIDIA L20`. The generator fixes
-`dispatcher_remote_command: /usr/local/bin/dpa4-python`; the dispatcher itself
-continues to use `python3`. APEX uploads the serialization dependencies and
-normalizes OpenAPI `jobId` for DPDispatcher result downloads. Use APEX 1.3.3
-or newer with these fixes; changing only global.json on an old client is insufficient.
-
-Verified workflow: `tongqi-openapi-acceptance-r5-relax-vwsb5` (108-atom FeCoNi
-static calculation, post-processing, automatic retrieval and local archive).
-This does not certify gamma convergence or the complete phonon/MD benchmark.
-The outer submission architecture is unchanged; `--sandbox` selects the inner
-OpenAPI backend, not an Agent-created outer sandbox.
-
 name: apex-flow
-description: Run APEX relaxation and 15-property materials workflows with VASP, ABACUS, or LAMMPS, including EOS, elastic, surface/defect, phonon/Grüneisen, parent-aware Gamma line/surface, finite-temperature lattice/elastic/annealing, two-phase melting-point brackets, previews, reporting, and RSS/high-entropy generation. Supports the validated general DPA4 phonoLAMMPS runtime and a bundled alloytongqi checkpoint with a separate fail-closed L20 profile. Use for APEX, alloy properties, melting/coexistence, stacking faults, random solid solutions, or multi-property DFT/MLIP screening.
+description: Run APEX relaxation and 15-property materials workflows with VASP, ABACUS, or LAMMPS, including EOS, elastic, surface/defect, phonon/Grüneisen, parent-aware Gamma line/surface, finite-temperature lattice/elastic/annealing, two-phase melting-point brackets, previews, reporting, and RSS/high-entropy generation. Supports the general DeePMD TensorFlow/PyTorch runtime and a bundled alloytongqi checkpoint with a separate fail-closed L20 profile. Use for APEX, alloy properties, melting/coexistence, stacking faults, random solid solutions, or multi-property DFT/MLIP screening.
 ---
+
 
 # APEX Flow — Alloy Properties EXplorer
 
@@ -91,8 +76,8 @@ Options to offer via AskQuestion:
     `RuntimeError: Unknown model type: dpa4`; LAMMPS also aborts while
     initializing `pair_style deepmd`. The configured `registry.dp.tech`
     endpoint itself was pull-denied, so retain the tested mirror digest in any
-    report. Keep this old image as the general APEX default and the legacy
-    phonon/Grüneisen forced image; do not submit DPA4 through it.
+    report. The new general DeePMD image inherits this loader limitation;
+    do not submit the alloytongqi DPA4 checkpoint through it.
   - For DPA4, use `--runtime-profile dpa4-alloytongqi-l20`. The generator
     uses the pinned published image from the profile. The maintainer has enabled
     this release with `release_status: enabled`; its
@@ -101,7 +86,7 @@ Options to offer via AskQuestion:
     is recorded separately in `openapi_qualification`.
     T4 is absent from the sandbox catalog checked on 2026-10-15; historical
     T4 results do not qualify L20. Never transplant a T4 `.pt2`.
-    Once published, the generator must write
+    The generator writes
     `/usr/local/bin/dpa4-lmp -in in.lammps` and the full
     `/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} --dim {dim}
     {primitive_axes}` template; never shorten or override these entrypoints.
@@ -198,7 +183,7 @@ noise floor. Do not give completion-time estimates without throughput evidence.
     - 返回: `{"code": 0, "data": {"ticket": "UUID"}}`
   - Verify that `global.json` contains a non-empty `bohrium_config.ticket` before submission.
   - `run.sh` must verify/reuse APEX and call `apex submit`. Do not add ticket API calls or depend on `BOHRIUM_ACCESS_KEY` inside the APEX container — 容器内没有此环境变量。
-  - Package the generated `ensure_apex.py` with `run.sh`. It reuses a working APEX >= 1.3.2 from the image without pip/network access. Only missing or older APEX is bootstrapped with `apex-flow==1.3.2.post1`; CLI failures stop submission.
+- `ensure_apex.py` validates preinstalled APEX >= 1.3.4 using the submission interpreter. Missing, old or broken runtimes stop submission: regenerate the configuration and select the current APEX/CPU image. No pip or GitHub download occurs during startup.
   - Use the APEX image for the outer submission client and make/post steps. `dispatcher_image` is only the DPDispatcher launcher; GPU/CPU calculator images are separate.
   - Ordinary Bohrium jobs use `scass_type="1 * NVIDIA L20_48g"`; OpenAPI Sandbox uses `machine_type="c16_m120_1 * NVIDIA L20"`. Verify against the matching live machine catalog; these names are not interchangeable.
    See `reference/submission.md`.
@@ -233,11 +218,11 @@ legacy recommendation command describes job submission SKUs only.
   ```bash
    python scripts/validate_apex_combo.py list-combos --backend lammps --prefer gpu
    python scripts/validate_apex_combo.py check \
-     --image registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2 \
+     --image registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016 \
      --scass "1 * NVIDIA L20_48g"
   ```
    Use `recommend` / `list-combos` for the selected runtime profile.
-   The general DPA4 image 0.0.2 and the bundled alloytongqi profile are separate
+   The general DeePMD GPU image and the bundled alloytongqi profile are separate
    contracts. For alloytongqi, use the dedicated L20 image, one GPU and one MPI
    rank. Job `scass_type` is `1 * NVIDIA L20_48g`; sandbox SKU
    `c16_m120_1 * NVIDIA L20` must never be copied into a job submission.
@@ -469,7 +454,7 @@ See `reference/submission.md` for the full validated template.
    uses a hashed image-resident `.pt2` and is generated only after publication.
    Default to `"type_map": "auto"`.
 3. **Joint workflow recommended.** Use `joint` flow (relaxation + properties) for most use cases to ensure proper relaxation before property calculations.
-4. **GPU for ML potentials.** DeePMD, MACE, and NEP benefit from GPU acceleration. Set `scass_type` to a validated GPU SKU from `validate_apex_combo.py recommend --prefer gpu` (default: `"1 * NVIDIA L20_48g"`; RTX 4090 remains compatible).
+4. **GPU for ML potentials.** DeePMD, MACE, and NEP benefit from GPU acceleration. Set `scass_type` to a validated GPU SKU from `validate_apex_combo.py recommend --prefer gpu` (default: `"1 * NVIDIA L20_48g"`; other GPUs require separate validation).
 5. **Supercell sizing depends on the input atom count, not only the default JSON.**
    Treat defaults as targets for **unit-cell inputs**. First inspect the user's
    structure; if it is already large enough, prefer `[1,1,1]` after confirmation.
@@ -540,7 +525,7 @@ Successfully validated workflow (ID: `cu-fcc-elastic-v3-joint-sdfml`):
 | `reference/rss_workflow.md`      | RSS structure generation workflow                                                                                                                     |
 | `reference/examples.md`          | Complete worked examples for common scenarios                                                                                                         |
 
-OpenAPI bootstrap: `ensure_apex.py` reuses APEX >= 1.3.3. Older runtimes install the immutable verified commit `7d867f4e8ef06e22708b0e151cc48571c4bf53a0` from Zikkying/APEX once; this source bootstrap does not depend on a PyPI release.
+- `ensure_apex.py` validates preinstalled APEX >= 1.3.4 using the submission interpreter. Missing, old or broken runtimes stop submission: regenerate the configuration and select the current APEX/CPU image. No pip or GitHub download occurs during startup.
 
 ### Required submission and Python runtime contract
 
@@ -561,3 +546,42 @@ OpenAPI bootstrap: `ensure_apex.py` reuses APEX >= 1.3.3. Older runtimes install
   image; it is not a substitute for dependency checks when building a new image.
   A new image digest requires a new real acceptance run before replacing the
   currently accepted digest. Do not run pip install in calculator jobs.
+
+## Qualified OpenAPI submission
+
+`--runtime-profile dpa4-alloytongqi-l20 --sandbox` is enabled for the pinned
+slim02 image and `machine_type: c16_m120_1 * NVIDIA L20`. The generator fixes
+`dispatcher_remote_command: /usr/local/bin/dpa4-python`; the dispatcher itself
+continues to use `python3`. APEX uploads the serialization dependencies and
+normalizes OpenAPI `jobId` for DPDispatcher result downloads. Use APEX 1.3.3
+or newer with these fixes; changing only global.json on an old client is insufficient.
+
+Verified workflow: `tongqi-openapi-acceptance-r5-relax-vwsb5` (108-atom FeCoNi
+static calculation, post-processing, automatic retrieval and local archive).
+This does not certify gamma convergence or the complete phonon/MD benchmark.
+The outer submission architecture is unchanged; `--sandbox` selects the inner
+OpenAPI backend, not an Agent-created outer sandbox.
+
+## Runtime selection and success checks (2026-10-16)
+
+Use the images and absolute executable paths emitted by `generate_config.py`.
+The APEX/CPU image preinstalls APEX 1.3.4 in `/opt/apex-venv` and runs classical
+LAMMPS through `/usr/bin/lmp`. The general DeePMD GPU image uses
+`/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on L20.
+It supports the tested TensorFlow .pb and DPA-3.2 PyTorch .pth cases; this is
+not qualification for every model, MACE, NEP, or another GPU. Tongqi retains
+its separate pinned L20 profile and wrappers.
+
+Do not copy image or machine settings from old job folders. Generate fresh
+configuration, record the loaded skill revision, actual APEX version, image,
+model hash, GPU/CPU receipt, and command. Do not infer calculator success from
+a Bohrium Finished status or a green dflow step. Inspect each task's
+`apex_task_status.json`, exit code, and finite energy output. A failed gamma
+zero-displacement reference is a calculator failure, not evidence of a
+post-processing defect. Retrieve the original error before retrying; reuse
+successful calculations rather than resubmitting an entire workflow.
+
+For a new MLIP/geometry combination, run its actual zero-displacement gamma
+slab first. A small periodic-cell relaxation does not validate a larger slab.
+
+For phonon/Gruneisen, retain the generated absolute `phonolammps_run_command`: CPU uses `/opt/apex-venv/bin/phonolammps`, general DeePMD uses `/opt/deepmd-kit-3.1.3/bin/phonolammps`. Preserve `{input_file}`, `{poscar}`, `{dim}` and `{primitive_axes}`. Sandbox login shells reset PATH; a bare `phonolammps` command is not a valid substitute. Tongqi keeps its dedicated wrapper.

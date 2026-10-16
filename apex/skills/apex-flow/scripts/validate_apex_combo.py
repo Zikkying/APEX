@@ -8,7 +8,7 @@ Use from the agent skill or as a pre-check in generate_config.py.
 Usage:
     python validate_apex_combo.py list-combos --backend lammps --prefer gpu
     python validate_apex_combo.py check \\
-        --image registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2 \\
+        --image registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016 \\
         --scass "1 * NVIDIA L20_48g"
     python validate_apex_combo.py recommend --backend lammps --prefer cpu
 """
@@ -23,14 +23,8 @@ from typing import Optional
 
 
 REGISTRY_PREFIX = "registry.dp.tech/dptech/"
-DPA4_LAMMPS_IMAGE = (
-    "registry.dp.tech/dptech/dp/native/prod-16664/"
-    "dpa4-phonolammps:0.0.2"
-)
-CPU_LAMMPS_IMAGE = (
-    "registry.dp.tech/dptech/dp/native/prod-397637/"
-    "apex-flow:1.3.0.post"
-)
+DPA4_LAMMPS_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016'
+CPU_LAMMPS_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline'
 
 # Normalized tag → reason (always reject)
 BLOCKED_IMAGES = {
@@ -54,19 +48,8 @@ BLOCKED_IMAGE_ACCELERATORS = {
 
 # Recommended allow-lists (short tags or full image refs)
 RECOMMENDED_LAMMPS_IMAGES = {
-    "cpu": [
-        CPU_LAMMPS_IMAGE,
-        "registry.dp.tech/dptech/dp/native/prod-397637/deepmd-kit-phonolammps:3.1.3",
-        "registry.dp.tech/dptech/deepmd-kit:3.1.1",
-        "registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e",
-    ],
-    "gpu": [
-        DPA4_LAMMPS_IMAGE,
-        "registry.dp.tech/dptech/deepmd-kit:3.1.1",
-        "registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e",
-        "registry.dp.tech/dptech/deepmd-kit:3.1.0-cuda12.1",
-        "registry.dp.tech/dptech/deepmd-kit:3.0.1-cuda12.1",
-    ],
+    "cpu": [CPU_LAMMPS_IMAGE],
+    "gpu": [DPA4_LAMMPS_IMAGE],
 }
 
 RECOMMENDED_SCASS = {
@@ -77,13 +60,7 @@ RECOMMENDED_SCASS = {
         "c16_m32_cpu",
         "c8_m32_cpu",
     ],
-    "lammps_gpu": [
-        "1 * NVIDIA L20_48g",
-        "c8_m32_1 * NVIDIA 4090",
-        "c8_m31_1 * NVIDIA T4",
-        "c4_m15_1 * NVIDIA T4",
-        "c16_m62_1 * NVIDIA T4",
-    ],
+    "lammps_gpu": ["1 * NVIDIA L20_48g"],
     "abacus": ["c16_m32_cpu", "c32_m64_cpu", "c32_m128_cpu"],
     "vasp": ["c32_m128_cpu", "c16_m64_cpu", "c32_m64_cpu"],
     "outer": ["c1_m2_cpu", "c2_m4_cpu", "c2_m8_cpu"],
@@ -183,7 +160,7 @@ def check_combo(
                 )
             if reason is None:
                 reason = (
-                    "this machine is prohibited or unknown for the T4 PT2 "
+                    "this machine is prohibited or unknown for the L20 PT2 "
                     "profile"
                 )
             errors.append(
@@ -208,6 +185,8 @@ def check_combo(
             errors.append(
                 f"blocked image × accelerator '{tag}' × '{accelerator}': {reason}"
             )
+    if "apex-deepmd-gpu:" in tag and "NVIDIA L20" not in scass:
+        errors.append("This GPU image is qualified on NVIDIA L20 only")
     if tag.endswith("dpa4-phonolammps:0.0.2") and "_cpu" in scass.lower():
         errors.append(
             "blocked DPA4 image × CPU machine: image 0.0.2 did not finish "
@@ -268,6 +247,8 @@ def recommend(
             "prefer": prefer,
             "image": images[0],
             "scass_type": RECOMMENDED_SCASS[key][0],
+            "run_command": "/usr/local/bin/apex-lmp -in in.lammps" if prefer == "gpu" else "/usr/bin/lmp -in in.lammps",
+            "dispatcher_remote_command": "/usr/local/bin/apex-calculator-python" if prefer == "gpu" else "/opt/apex-venv/bin/python",
             "alternatives": {
                 "images": images,
                 "scass_types": RECOMMENDED_SCASS[key],
@@ -278,7 +259,7 @@ def recommend(
         return {
             "backend": backend,
             "prefer": "cpu",
-            "image": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post",
+            "image": "registry.dp.tech/dptech/abacus:3.8.2",
             "scass_type": RECOMMENDED_SCASS["abacus"][0],
             "alternatives": {"scass_types": RECOMMENDED_SCASS["abacus"]},
             "outer_machine": RECOMMENDED_SCASS["outer"][0],
@@ -341,9 +322,9 @@ def list_combos(
         "notes": [
             "Always validate image×scass before writing global.json / submitting.",
             "Outer Bohrium job should use c1_m2_cpu, never GPU.",
-            "DPA4 image 0.0.2 is validated on NVIDIA L20 and RTX 4090; L20 is the default GPU resource.",
+            "General DeePMD GPU runtime targets NVIDIA L20; other GPUs need separate qualification.",
             "DPA4 image 0.0.2 is blocked on CPU machines after sequential deployment timeouts.",
-            "For triclinic cells, avoid deepmd-kit:3.1.1; prefer the DPA4 0.0.2 image.",
+            "For triclinic cells, avoid deepmd-kit:3.1.1; qualify the chosen model and actual cell on the general DeePMD runtime.",
             "The bundled dpa4-alloytongqi-l20 profile remains fail-closed until its immutable image ref@digest passes post-snapshot qualification.",
         ],
     }
