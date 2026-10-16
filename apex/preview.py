@@ -18,6 +18,7 @@ from monty.serialization import loadfn
 
 from apex.core.common_prop import make_property_instance
 from apex.utils import handle_prop_suffix
+from apex.preview_checks import gamma_report, save_report, source_record, add_check
 
 
 def _natural_key(path: str):
@@ -631,7 +632,15 @@ def preview_parameter_file(
     gif_xshift: float = 0.0,
     gif_yshift: float = 0.0,
     gif_view: str = "auto",
+    check_only: bool = False,
+    strict: bool = False,
+    interface_layers: int | None = None,
+    interface_target: dict | None = None,
+    composition_tolerance: float = 1.e-6,
+    layer_tolerance: float = 0.2,
+    export_structures: bool = False,
 ) -> List[str]:
+    _validate_check_options(interface_layers, interface_target, composition_tolerance, layer_tolerance)
     parameter_path = Path(parameter_file).resolve()
     payload = loadfn(str(parameter_path))
     if not isinstance(payload, dict):
@@ -651,6 +660,14 @@ def preview_parameter_file(
 
     resolved_interaction = _resolve_interaction_paths(parameter_path.parent, interaction)
     output_paths: List[str] = []
+    failures = []
+    expanded_structures = []
+    for pattern in structures:
+        matches = sorted(glob.glob(str((parameter_path.parent / pattern).resolve())), key=_natural_key)
+        if not matches:
+            raise FileNotFoundError(f"No structure matched: {pattern}")
+        expanded_structures.extend(matches)
+    structures = list(dict.fromkeys(expanded_structures))
 
     with tempfile.TemporaryDirectory(prefix="apex_preview_") as temp_root_text:
         temp_root = Path(temp_root_text)
@@ -667,88 +684,144 @@ def preview_parameter_file(
         if not runnable_properties:
             raise RuntimeError(f"{parameter_file} has no runnable properties")
 
-        for structure_index, structure_glob in enumerate(structures):
-            structure_dir = _resolve_structure_path(parameter_path.parent, structure_glob)
+        for structure_index, structure_dir in enumerate(structures):
             for prop_index, (prop, suffix, do_refine) in enumerate(runnable_properties):
-                prop_obj = make_property_instance(
-                    {**deepcopy(prop), "type": prop["type"]},
-                    resolved_interaction,
-                )
-                prop_label = ""
-                if len(runnable_properties) > 1 or len(structures) > 1:
-                    prop_label = prop["type"]
-                    if suffix:
-                        prop_label = f"{prop_label}_{suffix}"
-                    if len(structures) > 1:
-                        prop_label = f"{Path(structure_dir).name}_{prop_label}"
-
-                output_gif = _derive_output_gif_path(
-                    parameter_path,
-                    len(structures),
-                    prop_label,
-                )
-
-                work_dir = temp_root / f"work_{structure_index}_{prop_index}"
-                work_dir.mkdir(parents=True, exist_ok=True)
-                equi_dir = _prepare_equilibrium_dir(
-                    structure_dir,
-                    temp_root,
-                    f"structure_{structure_index}_{prop_index}",
-                )
-                make_kwargs = {}
-                if prop.get("type") == "gamma_surface":
-                    make_kwargs["require_relaxation_result"] = False
-                task_list = prop_obj.make_confs(
-                    str(work_dir), equi_dir, refine=do_refine, **make_kwargs
-                )
-                if prop.get("type") == "gamma_surface":
-                    _warn_gamma_surface_overlaps(task_list)
-                    task_list = _arrange_gamma_surface_tasks(task_list)
-
-                poscar_files = [os.path.join(task_dir, "POSCAR") for task_dir in task_list]
-                frames = _load_frames(poscar_files)
-                property_type = prop.get("type")
-                is_gamma_preview = property_type in {"gamma", "gamma_surface"}
-                views = _requested_gif_views(gif_view, property_type)
-                if not is_gamma_preview and views != ["default"]:
-                    raise RuntimeError(
-                        "--gif-view slip-plane, parent-bc, and both are "
-                        "supported only for type=gamma or type=gamma_surface"
+                error_path = parameter_path.with_name(f"{parameter_path.stem}_s{structure_index}_p{prop_index}.preview-error.json")
+                property_cwd = os.getcwd()
+                report = None
+                try:
+                    if prop.get("type") in {"gamma", "gamma_surface"} and (do_refine or prop.get("reproduce") or prop.get("start_confs_path")):
+                        raise ValueError("Gamma preview checks require direct bulk input; refine, reproduce and start_confs_path are not supported by this preview source resolver")
+                    prop_obj = make_property_instance(
+                        {**deepcopy(prop), "type": prop["type"]},
+                        resolved_interaction,
                     )
-                parent_structure = None
-                plane_miller = None
-                slip_direction = None
-                if is_gamma_preview and "parent-bc" in views:
-                    (
-                        parent_structure,
-                        plane_miller,
-                        slip_direction,
-                    ) = _resolved_gamma_view_context(prop_obj)
-                for view in views:
-                    view_frames = (
-                        _gamma_frames_for_view(
-                            frames,
-                            view,
-                            parent_structure=parent_structure,
-                            plane_miller=plane_miller,
-                            slip_direction=slip_direction,
-                            use_cell_axis=property_type == "gamma_surface",
+                    prop_label = ""
+                    if len(runnable_properties) > 1 or len(structures) > 1:
+                        prop_label = prop["type"]
+                        if suffix:
+                            prop_label = f"{prop_label}_{suffix}"
+                        if len(structures) > 1:
+                            prop_label = f"s{structure_index}_{Path(structure_dir).name}_{prop_label}"
+                        prop_label = f"{prop_label}_p{prop_index}"
+
+                    output_gif = _derive_output_gif_path(
+                        parameter_path,
+                        len(structures),
+                        prop_label,
+                    )
+
+                    error_path = output_gif.with_suffix(".preview.json")
+                    work_dir = temp_root / f"work_{structure_index}_{prop_index}"
+                    work_dir.mkdir(parents=True, exist_ok=True)
+                    equi_dir = _prepare_equilibrium_dir(
+                        structure_dir,
+                        temp_root,
+                        f"structure_{structure_index}_{prop_index}",
+                    )
+                    make_kwargs = {}
+                    if prop.get("type") == "gamma_surface":
+                        make_kwargs["require_relaxation_result"] = False
+                    original_cwd = os.getcwd()
+                    try:
+                        task_list = prop_obj.make_confs(
+                            str(work_dir), equi_dir, refine=do_refine, **make_kwargs
                         )
-                        if is_gamma_preview
-                        else frames
-                    )
-                    view_output_gif = _view_output_gif_path(output_gif, view)
-                    _write_gif(
-                        view_frames,
-                        str(view_output_gif),
-                        fps=gif_fps,
-                        dpi=gif_dpi,
-                        padding=gif_padding,
-                        xshift=gif_xshift,
-                        yshift=gif_yshift,
-                        progress_label=f"Loading {view} view...",
-                    )
-                    output_paths.append(str(view_output_gif))
+                    finally:
+                        os.chdir(original_cwd)
+                    if prop.get("type") in {"gamma", "gamma_surface"}:
+                        report = gamma_report(
+                            prop_obj, task_list, _find_structure_file(structure_dir),
+                            interface_layers=interface_layers, interface_target=interface_target,
+                            composition_tolerance=composition_tolerance, layer_tolerance=layer_tolerance,
+                        )
+                        report["parameter_source"] = source_record(parameter_path)
+                        report["strict_mode"] = strict
+                        if export_structures:
+                            export_dir = output_gif.with_suffix(".structures")
+                            export_dir.mkdir(exist_ok=True)
+                            export_dir = Path(tempfile.mkdtemp(prefix="run_", dir=export_dir))
+                            for task in task_list:
+                                destination = export_dir / Path(task).name
+                                destination.mkdir(exist_ok=True)
+                                for name in ("POSCAR", "POSCAR.tmp", "gamma_geometry.json", "displacement.json", "normalized_displacement.json", "slip_length.json"):
+                                    if (Path(task) / name).is_file():
+                                        shutil.copy2(Path(task) / name, destination / name)
+                            report["export_directory"] = str(export_dir)
+                        report_paths = save_report(report, output_gif.with_suffix(".preview.json"))
+                        output_paths.extend(report_paths)
+                        print(f"Gamma checks: {report['status']} — {report_paths[0]}", file=sys.stderr)
+                        if any(c["status"] == "fail" or (strict and c["status"] == "unknown") for c in report["checks"]):
+                            failures.append(report_paths[0])
+                            continue
+                    if check_only:
+                        continue
+                    if prop.get("type") == "gamma_surface":
+                        _warn_gamma_surface_overlaps(task_list)
+                        task_list = _arrange_gamma_surface_tasks(task_list)
+
+                    poscar_files = [os.path.join(task_dir, "POSCAR") for task_dir in task_list]
+                    frames = _load_frames(poscar_files)
+                    property_type = prop.get("type")
+                    is_gamma_preview = property_type in {"gamma", "gamma_surface"}
+                    views = _requested_gif_views(gif_view, property_type)
+                    if not is_gamma_preview and views != ["default"]:
+                        raise RuntimeError(
+                            "--gif-view slip-plane, parent-bc, and both are "
+                            "supported only for type=gamma or type=gamma_surface"
+                        )
+                    parent_structure = None
+                    plane_miller = None
+                    slip_direction = None
+                    if is_gamma_preview and "parent-bc" in views:
+                        (
+                            parent_structure,
+                            plane_miller,
+                            slip_direction,
+                        ) = _resolved_gamma_view_context(prop_obj)
+                    for view in views:
+                        view_frames = (
+                            _gamma_frames_for_view(
+                                frames,
+                                view,
+                                parent_structure=parent_structure,
+                                plane_miller=plane_miller,
+                                slip_direction=slip_direction,
+                                use_cell_axis=property_type == "gamma_surface",
+                            )
+                            if is_gamma_preview
+                            else frames
+                        )
+                        view_output_gif = _view_output_gif_path(output_gif, view)
+                        _write_gif(
+                            view_frames,
+                            str(view_output_gif),
+                            fps=gif_fps,
+                            dpi=gif_dpi,
+                            padding=gif_padding,
+                            xshift=gif_xshift,
+                            yshift=gif_yshift,
+                            progress_label=f"Loading {view} view...",
+                        )
+                        output_paths.append(str(view_output_gif))
+
+                except Exception as exc:
+                    if prop.get("type") not in {"gamma", "gamma_surface"}:
+                        raise
+                    error_report = report if report is not None else {
+                        "schema_version": 1, "source": {"path": structure_dir},
+                        "checks": [], "frames": [], "requested_parameters": prop,
+                        "parameter_source": source_record(parameter_path), "strict_mode": strict,
+                    }
+                    add_check(error_report, "preview_generation", "fail", str(exc))
+                    output_paths.extend(save_report(error_report, error_path))
+                    failures.append(str(error_path))
+                    print(f"Gamma checks failed: {exc} — {error_path}", file=sys.stderr)
+                finally:
+                    os.chdir(property_cwd)
+
+    if failures:
+        raise RuntimeError("Gamma preview checks failed; reports: " + ", ".join(failures))
 
     return output_paths
 
@@ -765,9 +838,58 @@ def preview_from_args(args: argparse.Namespace) -> List[str]:
                 gif_xshift=args.gif_xshift,
                 gif_yshift=args.gif_yshift,
                 gif_view=getattr(args, "gif_view", "auto"),
+                check_only=getattr(args, "check_only", False),
+                strict=getattr(args, "strict", False),
+                interface_layers=getattr(args, "interface_layers", None),
+                interface_target=_parse_interface_targets(getattr(args, "interface_target", [])),
+                composition_tolerance=getattr(args, "composition_tolerance", 1.e-6),
+                layer_tolerance=getattr(args, "layer_tolerance", 0.2),
+                export_structures=getattr(args, "export_structures", False),
             )
         )
     return outputs
+
+
+def _parse_interface_targets(values):
+    targets = {}
+    for value in values:
+        try:
+            element, fraction = value.split("=", 1)
+            if element in targets:
+                raise ValueError("duplicate element")
+            targets[element] = float(fraction)
+        except ValueError as exc:
+            raise ValueError("--interface-target expects unique ELEMENT=FRACTION entries") from exc
+    return targets
+
+
+def _validate_check_options(layers, targets, tolerance, layer_tolerance):
+    from pymatgen.core import Element
+    if layers is not None and (isinstance(layers, bool) or not isinstance(layers, int) or layers <= 0):
+        raise ValueError("--interface-layers must be a positive integer")
+    if targets and layers is None:
+        raise ValueError("--interface-target requires --interface-layers")
+    for element, fraction in (targets or {}).items():
+        Element(element)
+        if isinstance(fraction, bool) or not np.isfinite(fraction) or not 0 <= fraction <= 1:
+            raise ValueError("Interface target fractions must be finite and between 0 and 1")
+    if sum((targets or {}).values()) > 1 + 1.e-12:
+        raise ValueError("Interface target fractions cannot sum to more than 1")
+    if not np.isfinite(tolerance) or not 0 <= tolerance <= 1:
+        raise ValueError("--composition-tolerance must be a fraction between 0 and 1")
+    if not np.isfinite(layer_tolerance) or layer_tolerance <= 0:
+        raise ValueError("--layer-tolerance must be positive angstroms")
+
+
+def add_check_arguments(parser):
+    parser.add_argument("--check-only", action="store_true", help="Generate and check structures without GIF rendering")
+    parser.add_argument("--strict", action="store_true", help="Also fail on unknown check results (e.g. undefined interface composition)")
+    parser.add_argument("--interface-layers", type=int, help="Number of atomic layers on EACH side of the internal fault")
+    parser.add_argument("--interface-target", action="append", default=[], metavar="ELEMENT=FRACTION",
+                        help="Target combined interface atomic fraction, e.g. Ti=0.1; repeat for more elements")
+    parser.add_argument("--composition-tolerance", type=float, default=1.e-6, help="Absolute atomic-fraction tolerance")
+    parser.add_argument("--layer-tolerance", type=float, default=0.2, help="Maximum atomic-layer width in angstroms")
+    parser.add_argument("--export-structures", action="store_true", help="Persist generated Gamma POSCARs and metadata beside the report")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -810,6 +932,7 @@ def build_parser() -> argparse.ArgumentParser:
             "bc plane, or explicitly write both views"
         ),
     )
+    add_check_arguments(parser)
     return parser
 
 
