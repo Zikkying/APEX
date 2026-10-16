@@ -9,6 +9,7 @@ while repairing the failed step.
 
 | Symptom | Inspect | Repair |
 |---|---|---|
+| Local `apex` command missing / `ModuleNotFoundError: apex` | Agent interpreter and preflight log | Run preview and full validation in the [APEX/CPU preflight job](submission.md#preflight-in-the-apexcpu-image), collect the reports, then submit the checked inputs. |
 | Missing ticket or authentication failure | Selected execution profile and `global.json` | Cloud/MM: run `refresh-global` on the Agent before packaging; use its `bohrium_config.ticket`. Installed direct mode: use `apex account`. |
 | Invalid project ID | Generator validation output | Supply `BOHRIUM_PROJECT_ID` or `--project-id`; ticket-mode IDs must be integers. |
 | Image pull denied / unexpected old image | Submitted `global.json`, inner-job image and project access | Regenerate with the current skill; verify access to the image in the active project. Saved jobs retain their original configuration. |

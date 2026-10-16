@@ -75,18 +75,65 @@ the job directory is packaged:
 
 > **WARNING**: The log may show `WARNING:root:Missing Bohrium account fields: email, password.` — this is **non-fatal**; ticket-based auth works without email/password.
 
+## Preflight in the APEX/CPU image
+
+The MM Agent prepares files; an APEX runtime performs geometry preparation and
+scientific validation. Probe the Agent interpreter with
+`python -c "import apex, pymatgen, monty"`. When it is unavailable, use the
+APEX/CPU image from [Runtime images](runtime-images.md) for a short CPU preflight
+job. Select an available CPU resource with enough memory for the structure.
+
+Stage the generated job directory, all referenced input files, and the current
+skill's `scripts/` and `data/` directories under `.apex-skill/` in that job.
+Keeping these directories together lets the helpers resolve profile data.
+Prepare the ticket on the Agent before upload. Execute from the task root:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+PY=/opt/apex-venv/bin/python
+"$PY" .apex-skill/scripts/ensure_apex.py
+"$PY" .apex-skill/scripts/validate_inputs.py \
+  --param param.json --global global.json 2>&1 | tee preflight.log
+
+# Include for gamma_surface or a requested Gamma configuration preview.
+"$PY" -m apex preview param.json 2>&1 | tee preview.log
+if grep -Fq 'Generated Gamma surface contains overlapping atoms.' preview.log; then
+    echo 'Resolve the reported geometry before submission.' >&2
+    exit 1
+fi
+```
+
+For other properties, omit the preview block and retain validation. Check the
+job exit code, `Validation PASSED`, geometry diagnostics and requested preview
+artifacts. Download the reports and generated structures/visualizations for
+inspection; present a requested preview to the user before submitting compute.
+
+Use the checked input files for the production job. Any change to the structure,
+model, property parameters or runtime configuration requires another preflight.
+If no intermediate preview approval is needed, these commands may run at the
+start of the existing outer job, followed by `apex submit` only after success.
+This preflight uses the CPU image even when the inner calculator uses L20.
+
+For `ModuleNotFoundError: apex`, use this runtime procedure; the debug guide
+contains other environment and geometry repairs. Full preflight is performed
+in the image, rather than treating a local dependency error as a passed check.
+
 ## Outer Job run.sh Template
 
 ```bash
 #!/bin/bash
 set -eo pipefail
 
-python3 ensure_apex.py  # Generated helper; copy it with run.sh
+PY=/opt/apex-venv/bin/python
+"$PY" .apex-skill/scripts/ensure_apex.py
+"$PY" .apex-skill/scripts/validate_inputs.py --param param.json --global global.json
+# Include the preview block above when applicable.
 
 # Authentication is already stored in global.json by generate_config.py.
 # Do not read BOHRIUM_ACCESS_KEY or refresh the ticket in this container.
 set +eo pipefail
-python3 -m apex submit param.json -c global.json -n "<workflow-name>" 2>&1 | tee apex_submit.log
+"$PY" -m apex submit param.json -c global.json -n "<workflow-name>" 2>&1 | tee apex_submit.log
 EXIT_CODE=${PIPESTATUS[0]}
 set -eo pipefail
 
@@ -104,7 +151,7 @@ fi
 **Key points:**
 - Reuse an installed stable APEX >= 1.3.4 after checking imports and CLI startup. No pip request is made for a working image runtime.
 - `ensure_apex.py` validates preinstalled APEX >= 1.3.4 using the submission interpreter. Missing, old or broken runtimes stop submission: regenerate the configuration and select the current APEX/CPU image. No pip or GitHub download occurs during startup.
-- Include `ensure_apex.py` in the packaged outer job. Use the APEX client image, not the dispatcher or GPU calculator image.
+- Include the current skill `scripts/` and `data/` under `.apex-skill/` in the packaged outer job. Use the APEX client image, not the dispatcher or GPU calculator image.
 - The installed APEX code is automatically sent to inner dflow steps via `upload_packages`
 - `run.sh` does not access `BOHRIUM_ACCESS_KEY` or modify `global.json`
 - **单次执行，不重试** — 失败即退出，由用户决定是否重新提交
