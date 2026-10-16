@@ -24,7 +24,7 @@ from typing import Optional
 
 REGISTRY_PREFIX = "registry.dp.tech/dptech/"
 DPA4_LAMMPS_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016'
-CPU_LAMMPS_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016'
+CPU_LAMMPS_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline'
 
 # Normalized tag → reason (always reject)
 BLOCKED_IMAGES = {
@@ -160,7 +160,7 @@ def check_combo(
                 )
             if reason is None:
                 reason = (
-                    "this machine is prohibited or unknown for the T4 PT2 "
+                    "this machine is prohibited or unknown for the L20 PT2 "
                     "profile"
                 )
             errors.append(
@@ -322,9 +322,9 @@ def list_combos(
         "notes": [
             "Always validate image×scass before writing global.json / submitting.",
             "Outer Bohrium job should use c1_m2_cpu, never GPU.",
-            "DPA4 image 0.0.2 is validated on NVIDIA L20 and RTX 4090; L20 is the default GPU resource.",
+            "General DeePMD GPU runtime targets NVIDIA L20; other GPUs need separate qualification.",
             "DPA4 image 0.0.2 is blocked on CPU machines after sequential deployment timeouts.",
-            "For triclinic cells, avoid deepmd-kit:3.1.1; prefer the DPA4 0.0.2 image.",
+            "For triclinic cells, avoid deepmd-kit:3.1.1; qualify the chosen model and actual cell on the general DeePMD runtime.",
             "The bundled dpa4-alloytongqi-l20 profile remains fail-closed until its immutable image ref@digest passes post-snapshot qualification.",
         ],
     }

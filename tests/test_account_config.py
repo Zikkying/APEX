@@ -52,7 +52,7 @@ class TestAccountConfig(unittest.TestCase):
         self.assertEqual(
             Config().lammps_image_name,
             "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
-            "apex-flow-cpu:1.3.4-20261016",
+            "apex-flow-cpu:1.3.4-20261016-offline",
         )
 
     def test_openapi_default_gpu_machine_is_l20(self):

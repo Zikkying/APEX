@@ -105,11 +105,11 @@ Each requires specific configuration in `param.json` under the `"interaction"` k
 GPU image (`deepmd`; TensorFlow `.pb` and compatible PyTorch `.pth`):
 `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016`
 
-CPU image (`snap`, `eam_alloy`, `eam_fs`, `meam`,
+CPU image (`eam_alloy`, `eam_fs`, `meam`,
 `meam_spline`):
-`registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016`
+`registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline`
 
-Use `/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on NVIDIA L20. MACE, NEP, GAP and RANN require separately validated custom images. This general DeePMD runtime does not support the bundled alloytongqi DPA4 architecture; keep its dedicated profile.
+Use `/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on NVIDIA L20. MACE, NEP, GAP, RANN and SNAP require separately validated custom images. This general DeePMD runtime does not support the bundled alloytongqi DPA4 architecture; keep its dedicated profile.
 
 For provenance, an older phonoLAMMPS 3.1.3 tag was
 available from the Bohrium registry mirror at repo digest

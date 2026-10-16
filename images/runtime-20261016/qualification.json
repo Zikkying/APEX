@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-16",
+  "project_id": 397953,
+  "gpu": {
+    "image": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+    "digest": "sha256:0c761010974c96b7704ce48add4fe7f98a447fd387184051ec85039840fcd646",
+    "build_id": 179011,
+    "sandbox_id": "default--scicomp-l20-tmzjjo-xssdq",
+    "machine": "c16_m120_1 * NVIDIA L20",
+    "status": "runtime_passed",
+    "cases": [
+      {
+        "name": "TensorFlow Al 32 atoms run 0",
+        "exit_code": 0,
+        "energy_ev": -59.919936
+      },
+      {
+        "name": "DPA-3.2 PyTorch Al 32 atoms run 0",
+        "exit_code": 0,
+        "energy_ev": -120.01878
+      },
+      {
+        "name": "DPA-3.2 Ni 540 atom gamma reference",
+        "exit_code": 0,
+        "final_energy_ev": -2910.00970768929,
+        "wall_seconds": 37,
+        "minimization_stopping_criterion": "linesearch alpha is zero",
+        "force_converged": false
+      }
+    ],
+    "scope": "Fresh-image L20 sandbox calculator runtime; not a full GPU dflow workflow or universal model qualification",
+    "input_sha256": {
+      "tf_model": "a75cb7b7f9c205aca57d5f9562ff8e1ef9d61c90dae877a2a4c9b31fde22cc32",
+      "pt_model": "055fbbcb83c9063f7809a74803c600eb34cf0b3f7caf15e0e0d2b86834f30e8e",
+      "ni540_structure": "8a81b92fb2ed5dabff6ce9542c78cedd5998ecd5dbad2208fd82b92628a12d7f"
+    },
+    "log_sha256": {
+      "deepmd_tf": "98e7fe7e02bb0900488c6f7bf0f04cc1ef3d22eff227d5f52df4951c38226f95",
+      "deepmd_pt": "f0d4dc6fff663d5430f6dc966ff9e002523d506fa06ffd7f54ea6b7d1b59b067",
+      "ni540": "694693ce63887bb4b15ace0b913af9c9b235b97fa32d5823ae397e5c82e9d487"
+    },
+    "native_job_attempt": {
+      "bohr_id": 20904086,
+      "status": "cancelled_after_resource_rescheduling",
+      "calculator_acceptance": false
+    }
+  },
+  "cpu": {
+    "status": "pending"
+  }
+}

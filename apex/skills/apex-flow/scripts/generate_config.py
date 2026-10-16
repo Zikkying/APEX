@@ -55,9 +55,9 @@ SANDBOX_DFLOW_HOST = "https://lbg-workflow-dflow.dp.tech"
 SANDBOX_DISPATCHER_IMAGE = (
     "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811"
 )
-APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016"
+APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
 LAMMPS_GPU_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016'
-LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016"
+LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
 # Backward-compatible alias used by external callers and older tests. New code
 # must select LAMMPS_GPU_IMAGE or LAMMPS_CPU_IMAGE from the potential type.
 LAMMPS_IMAGE = LAMMPS_GPU_IMAGE
@@ -231,8 +231,8 @@ GPU_POTENTIALS = {"deepmd", "mace", "nep"}
 
 def select_lammps_image(potential: str = None) -> str:
     """Return the validated LAMMPS image for a potential's resource class."""
-    if potential in {"mace", "nep", "gap", "rann"}:
-        raise ValueError("MACE/NEP/GAP/RANN require an explicitly validated custom image; default images do not qualify these pair styles")
+    if potential in {"mace", "nep", "gap", "rann", "snap"}:
+        raise ValueError("MACE/NEP/GAP/RANN/SNAP require an explicitly validated custom image; default images do not qualify these pair styles")
     if potential == "deepmd":
         return LAMMPS_GPU_IMAGE
     return LAMMPS_CPU_IMAGE

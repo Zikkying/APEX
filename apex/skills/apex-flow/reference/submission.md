@@ -66,7 +66,7 @@ APEX uses a **two-layer submission architecture**:
 ┌─────────────────────────────────────────────────────────────────┐
 │  Inner containers (managed by dflow on Bohrium)                 │
 │  - GPU LAMMPS: apex-deepmd-gpu:3.1.3-20261016                        │
-│  - CPU LAMMPS: apex-flow-cpu:1.3.4-20261016                          │
+│  - CPU LAMMPS: apex-flow-cpu:1.3.4-20261016-offline                          │
 │  - ABACUS image: registry.dp.tech/dptech/abacus:3.8.2          │
 │  - VASP image: (user-provided)                                  │
 │  - Machine type per task: scass_type in global.json             │
@@ -157,9 +157,9 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 
 | Role | Image | Notes |
 |------|-------|-------|
-| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | APEX 1.3.4 make/run/post dependencies preinstalled |
+| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | APEX 1.3.4 make/run/post dependencies preinstalled |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016` | NVIDIA L20; DeePMD TensorFlow/PyTorch only; includes phonoLAMMPS |
-| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | Classical LAMMPS; Al EAM runtime acceptance |
+| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | Classical LAMMPS; Al EAM runtime acceptance |
 | **ABACUS calculator** | `registry.dp.tech/dptech/abacus:3.8.2` | Or user-specified |
 | **VASP calculator** | User must provide after confirming license | Commercial; **never invent a default image** |
 
@@ -244,7 +244,7 @@ The following is a type-annotated shape, not valid JSON:
         "ticket": "<UUID from API conversion — auto-filled by generate_config.py>",
         "project_id": <the same unquoted integer>
     },
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
     "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
     "lammps_run_command": "/usr/local/bin/apex-lmp -in in.lammps",
     "scass_type": "1 * NVIDIA L20_48g",
@@ -283,7 +283,7 @@ workflow and retrieves its results automatically:
    ```python
    Bohrium(action="submit",
      input_dir="<job_dir>",
-     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016",
+     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
      machine="c1_m2_cpu",
      cmd="bash run.sh")
    ```

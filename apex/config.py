@@ -70,12 +70,12 @@ class Config:
     # basic run config
     run_image_name: str = None
     run_command: str = None
-    apex_image_name: str = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016"
+    apex_image_name: str = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
     group_size: int = None
     pool_size: int = None
     upload_python_packages: list = field(default_factory=list)
     exclude_upload_files: list = field(default_factory=list)
-    lammps_image_name: str = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016'
+    lammps_image_name: str = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline'
     lammps_run_command: str = None
     phonolammps_run_command: str = None
     vasp_image_name: str = None

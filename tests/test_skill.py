@@ -248,7 +248,7 @@ class TestValidateApexCombo(unittest.TestCase):
 
     def test_recommend_lammps_cpu_uses_apex_flow(self):
         rec = self.combo.recommend("lammps", "cpu")
-        self.assertIn("apex-flow-cpu:1.3.4-20261016", rec["image"])
+        self.assertIn("apex-flow-cpu:1.3.4-20261016-offline", rec["image"])
         self.assertIn("_cpu", rec["scass_type"])
 
     def test_dpa4_image_is_blocked_on_cpu(self):
@@ -336,7 +336,7 @@ class TestGenerateConfigProjectId(unittest.TestCase):
         self.assertEqual(
             self.gen.LAMMPS_CPU_IMAGE,
             "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
-            "apex-flow-cpu:1.3.4-20261016",
+            "apex-flow-cpu:1.3.4-20261016-offline",
         )
 
     def test_combo_validator_has_no_property_cli(self):

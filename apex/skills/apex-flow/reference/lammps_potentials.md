@@ -262,12 +262,12 @@ manual map.
 | nep | Explicitly validated custom image required | Model-specific |
 | DPA4 alloytongqi | Published `dpa4-alloytongqi-l20` profile; use its pinned image and wrappers | One qualified L20 |
 | gap | Explicitly validated custom image required | Model-specific |
-| snap | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | No |
+| snap | Explicitly validated custom image required | CPU |
 | rann | Explicitly validated custom image required | Model-specific |
-| eam_alloy | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | No |
-| eam_fs | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | No |
-| meam | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | No |
-| meam_spline | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | No |
+| eam_alloy | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| eam_fs | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| meam | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
+| meam_spline | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | No |
 
 GPU and CPU calculators use separate images. Standard CPU calculations use the APEX/CPU image above.
 The table records APEX defaults, not compatibility with every model format.

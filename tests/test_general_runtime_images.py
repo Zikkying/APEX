@@ -37,7 +37,7 @@ class RuntimeSelectionTests(unittest.TestCase):
 
     def test_special_models_do_not_silently_use_deepmd_runtime(self):
         generator = load('generate_config')
-        for potential in ['mace', 'nep', 'gap', 'rann']:
+        for potential in ['mace', 'nep', 'gap', 'rann', 'snap']:
             with self.assertRaisesRegex(ValueError, 'custom image'):
                 generator.select_lammps_image(potential)
 
