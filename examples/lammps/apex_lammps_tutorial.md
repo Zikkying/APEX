@@ -115,17 +115,17 @@ Bohrium platform provides pre-configured environments, automated scheduling, and
     "email": "your_email@example.com",
     "password": "your_password",
     "program_id": 12345,
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post",
-    "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-397637/deepmd-kit-phonolammps:3.1.3",
-    "lammps_run_command": "lmp -in in.lammps",
-    "scass_type": "c8_m31_1 * NVIDIA T4"
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
+    "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+    "lammps_run_command": "/usr/local/bin/apex-lmp -in in.lammps",
+    "scass_type": "1 * NVIDIA L20_48g"
 }
 ```
 
 #### Key Parameters
 
 - **Authentication**: Email, password, and Bohrium program ID
-- **Images**: APEX and LAMMPS Docker images (check [Bohrium Registry](https://www.bohrium.com/web-images/public))
+- **Images**: This example uses the general DeePMD runtime on L20. For classical potentials or alloytongqi, use the corresponding image and commands in the [runtime image guide](../../apex/skills/apex-flow/reference/runtime-images.md).
 - **Resources**: `scass_type` specifies CPU cores, memory, and GPU (check [Bohrium Profiler](https://www.bohrium.com/profiler))
 
 #### Submission

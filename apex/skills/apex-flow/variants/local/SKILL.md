@@ -70,13 +70,14 @@ The exact installed choice is in `reference/execution-profile.md`.
   Use `"type_map": "auto"`. The old image's Bohrium registry mirror (digest
   `sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`)
   fails with `Unknown model type: dpa4`, so do not submit this model with the
-  default old LAMMPS image. The `dpa4-alloytongqi-l20` profile
-  must fail closed until an exact image ref/digest passes the packaged L20
-  benchmark. It targets one L20 SM 8.9 and one MPI rank; job SKU is
-  `1 * NVIDIA L20_48g`. T4 is absent from the current sandbox catalog.
+  legacy LAMMPS image. The `dpa4-alloytongqi-l20` profile is release-enabled
+  with OpenAPI static make/run/post/retrieval acceptance; its full benchmark
+  remains pending. See `reference/runtime-images.md` for the current image roles.
+  It targets one L20 SM 8.9 and one MPI rank; job SKU is
+  `1 * NVIDIA L20_48g`. T4 was absent from the sandbox catalog checked on 2026-10-15.
   Do not edit qualification status, invent a digest, or bypass validators.
   Other GPUs, CPU production, multi-rank and multi-GPU require separate evidence.
-  After publication, require absolute `/usr/local/bin/dpa4-lmp` and
+  Require absolute `/usr/local/bin/dpa4-lmp` and
   `/usr/local/bin/dpa4-phonolammps` entrypoints from the generated profile.
 - **VASP**: confirm a licensed executable/image appropriate to the selected
   profile. Verify every POTCAR locally. Cloud-only image discovery rules apply

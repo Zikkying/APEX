@@ -6,6 +6,8 @@ description: Run APEX relaxation and 15-property materials workflows with VASP, 
 
 # APEX Flow — Alloy Properties EXplorer
 
+Current image roles, absolute commands and acceptance scope: [Runtime images](reference/runtime-images.md).
+
 APEX is an automated workflow for computing alloy/material properties via batch DFT or MLIP calculations. It handles the full pipeline: structure preparation → task generation → computation → result extraction.
 
 ## When to Use APEX vs Other Skills
