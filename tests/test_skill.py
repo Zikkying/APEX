@@ -161,8 +161,8 @@ class TestApexSkill(unittest.TestCase):
             self.assertIn("outer Bohrium job", cloud_skill)
             self.assertIn("bohrium_config.ticket", cloud_skill)
             self.assertIn(
-                b"registry.dp.tech/dptech/dp/native/prod-397637/"
-                b"deepmd-kit-phonolammps:3.1.3",
+                b"registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+                b"apex-deepmd-gpu:3.1.3-20261016",
                 text_payload,
             )
             self.assertNotIn(
