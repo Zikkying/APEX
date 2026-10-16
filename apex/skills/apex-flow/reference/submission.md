@@ -25,7 +25,7 @@ at `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
 Use the profile's wrappers and model hashes. This release is enabled, with
 full image benchmark pending; OpenAPI static make/run/post/retrieval acceptance passed.
 
-The `dpa4-phonolammps:0.0.2` references below describe the generic GPU/base
+The `apex-deepmd-gpu:3.1.3-20261016` references below describe the generic DeePMD
 image, not the bundled alloytongqi deployment. Do not switch a tongqi job to
 that base image, a different checkpoint, or CPU to recover a failed submission.
 DPA4-Neo-OMat24 is a different model; its release date or element count does
@@ -55,7 +55,7 @@ APEX uses a **two-layer submission architecture**:
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Outer Bohrium Job (APEX image, c1_m2_cpu)                     │
-│  1. verify/reuse image APEX (>= 1.3.2)             │
+│  1. verify/reuse image APEX (>= 1.3.4)             │
 │  2. apex submit param.json -c global.json -n "<wf-name>"      │
 │  → Connects to workflows.deepmodeling.com                      │
 │  → Waits for completion and retrieves results automatically    │
@@ -65,8 +65,8 @@ APEX uses a **two-layer submission architecture**:
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Inner containers (managed by dflow on Bohrium)                 │
-│  - GPU LAMMPS: dpa4-phonolammps:0.0.2                        │
-│  - CPU LAMMPS: apex-flow:1.3.0.post                          │
+│  - GPU LAMMPS: apex-deepmd-gpu:3.1.3-20261016                        │
+│  - CPU LAMMPS: apex-flow-cpu:1.3.4-20261016                          │
 │  - ABACUS image: registry.dp.tech/dptech/abacus:3.8.2          │
 │  - VASP image: (user-provided)                                  │
 │  - Machine type per task: scass_type in global.json             │
@@ -133,8 +133,8 @@ fi
 ```
 
 **Key points:**
-- Reuse an installed stable APEX >= 1.3.2 after checking imports and CLI startup. No pip request is made for a working image runtime.
-- The generated `ensure_apex.py` installs `apex-flow==1.3.2.post1` only when missing or older. It fails on broken imports/CLI, and submission uses the same Python interpreter.
+- Reuse an installed stable APEX >= 1.3.4 after checking imports and CLI startup. No pip request is made for a working image runtime.
+- `ensure_apex.py` validates preinstalled APEX >= 1.3.4 using the submission interpreter. Missing, old or broken runtimes stop submission: regenerate the configuration and select the current APEX/CPU image. No pip or GitHub download occurs during startup.
 - Include `ensure_apex.py` in the packaged outer job. Use the APEX client image, not the dispatcher or GPU calculator image.
 - The installed APEX code is automatically sent to inner dflow steps via `upload_packages`
 - `run.sh` does not access `BOHRIUM_ACCESS_KEY` or modify `global.json`
@@ -157,25 +157,16 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 
 | Role | Image | Notes |
 |------|-------|-------|
-| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1` | Lightweight; just runs `apex submit` |
-| **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2` | NVIDIA L20 default; RTX 4090 compatible; includes phonoLAMMPS |
-| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post` | EAM/MEAM/SNAP/GAP/RANN CPU backend |
+| **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | APEX 1.3.4 make/run/post dependencies preinstalled |
+| **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016` | NVIDIA L20; DeePMD TensorFlow/PyTorch only; includes phonoLAMMPS |
+| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016` | Classical LAMMPS; Al EAM runtime acceptance |
 | **ABACUS calculator** | `registry.dp.tech/dptech/abacus:3.8.2` | Or user-specified |
 | **VASP calculator** | User must provide after confirming license | Commercial; **never invent a default image** |
 
 > Legacy `deepmd-kit:3.1.1` remains blocked with NVIDIA T4 and for triclinic
 > cells.
 
-> LAMMPS phonon and Grüneisen tasks using GPU potentials are forced to use
-> `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`.
-> CPU potentials retain the CPU image. Do not use 0.0.2 with a `*_cpu`
-> machine: sequential CPU validation stalled before the container command
-> started. Do not add the legacy `plugin load libdeepmd_lmp.so` command to
-> 0.0.2.
-> An older phonoLAMMPS 3.1.3 image at Bohrium registry mirror digest
-> `sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`
-> rejects the bundled DPA4 model with `Unknown model type: dpa4`; do not submit
-> that model under the old image or silently route it to another image.
+> The general GPU runtime includes phonoLAMMPS, but its runtime tests do not certify every phonon workflow or every DeePMD model. DPA4 alloytongqi requires its dedicated profile and wrappers; the general DeePMD 3.1.3 image does not support that DPA4 architecture.
 
 Select the dedicated DPA4 runtime explicitly. Inspect its current qualification with
 `validate_apex_combo.py list-combos --runtime-profile
@@ -194,7 +185,7 @@ unchanged.
 
 | Backend | scass_type (inner containers) | Notes |
 |---------|-------------------------------|-------|
-| LAMMPS (DeePMD/MACE/NEP) | `1 * NVIDIA L20_48g` | Validated sm89 default; RTX 4090 remains compatible |
+| LAMMPS (DeePMD) | `1 * NVIDIA L20_48g` | Qualified L20 default; other GPUs require validation |
 | LAMMPS (EAM/MEAM/SNAP) | `c16_m32_cpu` | CPU sufficient |
 | ABACUS | `c16_m32_cpu` | CPU |
 | VASP | `c32_m128_cpu` (default) | Align `mpirun -n <N>` with CPU count |
@@ -253,10 +244,10 @@ The following is a type-annotated shape, not valid JSON:
         "ticket": "<UUID from API conversion — auto-filled by generate_config.py>",
         "project_id": <the same unquoted integer>
     },
-    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
-    "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
-    "lammps_run_command": "lmp -in in.lammps",
-    "scass_type": "c16_m32_cpu",
+    "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016",
+    "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+    "lammps_run_command": "/usr/local/bin/apex-lmp -in in.lammps",
+    "scass_type": "1 * NVIDIA L20_48g",
     "group_size": 1,
     "pool_size": 1
 }
@@ -275,7 +266,7 @@ Do not upload or submit unless validation reports `Validation PASSED` and both
 project ID lines report `type=int`. Submit the newly validated directory as a
 new outer Bohrium job; retrying an old outer job reuses its old input snapshot.
 
-> For GPU potentials (DeePMD, MACE, NEP), change `scass_type` to `"1 * NVIDIA L20_48g"` by default; RTX 4090 remains compatible.
+> For the default DeePMD GPU image, use `scass_type: "1 * NVIDIA L20_48g"`. MACE/NEP require a separate custom runtime.
 > Before submitting, run `scripts/validate_apex_combo.py check` on the chosen image × scass_type.
 
 ## Agent-Managed Submission Workflow (Complete Lifecycle)
@@ -292,7 +283,7 @@ workflow and retrieves its results automatically:
    ```python
    Bohrium(action="submit",
      input_dir="<job_dir>",
-     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow:1.3.2-post1",
+     image="registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016",
      machine="c1_m2_cpu",
      cmd="bash run.sh")
    ```
@@ -348,3 +339,25 @@ Legacy Bohrium jobs (`context_type=Bohrium`) use `scass_type="1 * NVIDIA L20_48g
   image; it is not a substitute for dependency checks when building a new image.
   A new image digest requires a new real acceptance run before replacing the
   currently accepted digest. Do not run pip install in calculator jobs.
+
+## Runtime selection and success checks (2026-10-16)
+
+Use the images and absolute executable paths emitted by `generate_config.py`.
+The APEX/CPU image preinstalls APEX 1.3.4 in `/opt/apex-venv` and runs classical
+LAMMPS through `/usr/bin/lmp`. The general DeePMD GPU image uses
+`/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on L20.
+It supports the tested TensorFlow .pb and DPA-3.2 PyTorch .pth cases; this is
+not qualification for every model, MACE, NEP, or another GPU. Tongqi retains
+its separate pinned L20 profile and wrappers.
+
+Do not copy image or machine settings from old job folders. Generate fresh
+configuration, record the loaded skill revision, actual APEX version, image,
+model hash, GPU/CPU receipt, and command. Do not infer calculator success from
+a Bohrium Finished status or a green dflow step. Inspect each task's
+`apex_task_status.json`, exit code, and finite energy output. A failed gamma
+zero-displacement reference is a calculator failure, not evidence of a
+post-processing defect. Retrieve the original error before retrying; reuse
+successful calculations rather than resubmitting an entire workflow.
+
+For a new MLIP/geometry combination, run its actual zero-displacement gamma
+slab first. A small periodic-cell relaxation does not validate a larger slab.

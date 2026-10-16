@@ -102,19 +102,14 @@ Each requires specific configuration in `param.json` under the `"interaction"` k
 
 ### Default LAMMPS image and DPA4 compatibility
 
-GPU image (`deepmd`, `mace`, `nep`):
-`registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`
+GPU image (`deepmd`; TensorFlow `.pb` and compatible PyTorch `.pth`):
+`registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016`
 
-CPU image (`gap`, `snap`, `rann`, `eam_alloy`, `eam_fs`, `meam`,
+CPU image (`snap`, `eam_alloy`, `eam_fs`, `meam`,
 `meam_spline`):
-`registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post`
+`registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016`
 
-This image uses integrated USER-DEEPMD and CUDA 12.8. Do not add
-`plugin load libdeepmd_lmp.so`; the plugin command is unsupported. Its unified
-`lmp` entry dispatches RTX 4090/L20-class GPUs to the sm89 build and RTX 5090
-to sm120. The L20 and RTX 4090 sm89 paths are validated; L20 is the default
-because it has greater resource availability. Test sm120 on a real 5090 before
-relying on that path.
+Use `/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on NVIDIA L20. MACE, NEP, GAP and RANN require separately validated custom images. This general DeePMD runtime does not support the bundled alloytongqi DPA4 architecture; keep its dedicated profile.
 
 For provenance, an older phonoLAMMPS 3.1.3 tag was
 available from the Bohrium registry mirror at repo digest
@@ -125,11 +120,7 @@ initializing `pair_style deepmd`. Therefore the tested old runtime cannot
 execute the bundled DPA4 model. Do not submit the bundled model with that old
 image or select another image without an explicit qualified profile.
 
-> **LAMMPS phonon and Grüneisen**: for GPU potentials, `apex submit` forces
-> the DPA4 image above. It is validated on NVIDIA L20 and RTX 4090 and includes
-> phonoLAMMPS. L20 is the default resource.
-> CPU potentials keep the CPU image. Do not use the DPA4 image on a CPU
-> machine; sequential CPU jobs stalled during container preparation.
+> **LAMMPS phonon and Grüneisen**: the generic DeePMD GPU image includes phonoLAMMPS. Validate the requested model and phonon workflow before production. The dedicated tongqi profile provides its own fixed phonoLAMMPS wrapper.
 
 ### Bundled DPA4 model (`models/`)
 

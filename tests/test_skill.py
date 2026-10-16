@@ -31,9 +31,9 @@ class TestApexSkill(unittest.TestCase):
         self.assertIn("BOHRIUM_PROJECT_ID", text)
         self.assertIn("validate_apex_combo.py", text)
         self.assertIn("models/DPA4-alloytongqi/model.pt", text)
-        self.assertIn("dpa4-phonolammps:0.0.2", text)
+        self.assertIn("apex-deepmd-gpu:3.1.3-20261016", text)
         self.assertIn("Unknown model type: dpa4", text)
-        self.assertNotIn("DPA-3.2", text)
+        self.assertIn("DPA-3.2", text)
         self.assertIn("15-property", text)
         self.assertIn("displacement_points", text)
         self.assertIn("restart.coexistence.start", text)
@@ -243,12 +243,12 @@ class TestValidateApexCombo(unittest.TestCase):
 
     def test_recommend_lammps_gpu(self):
         rec = self.combo.recommend("lammps", "gpu")
-        self.assertIn("dpa4-phonolammps:0.0.2", rec["image"])
+        self.assertIn("apex-deepmd-gpu:3.1.3-20261016", rec["image"])
         self.assertIn("L20", rec["scass_type"])
 
     def test_recommend_lammps_cpu_uses_apex_flow(self):
         rec = self.combo.recommend("lammps", "cpu")
-        self.assertIn("apex-flow:1.3.0.post", rec["image"])
+        self.assertIn("apex-flow-cpu:1.3.4-20261016", rec["image"])
         self.assertIn("_cpu", rec["scass_type"])
 
     def test_dpa4_image_is_blocked_on_cpu(self):
@@ -328,15 +328,15 @@ class TestGenerateConfigProjectId(unittest.TestCase):
     def test_lammps_gpu_default_uses_validated_phonolammps_image(self):
         self.assertEqual(
             self.gen.LAMMPS_GPU_IMAGE,
-            "registry.dp.tech/dptech/dp/native/prod-16664/"
-            "dpa4-phonolammps:0.0.2",
+            "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+            "apex-deepmd-gpu:3.1.3-20261016",
         )
 
     def test_lammps_cpu_default_uses_apex_flow_image(self):
         self.assertEqual(
             self.gen.LAMMPS_CPU_IMAGE,
-            "registry.dp.tech/dptech/dp/native/prod-397637/"
-            "apex-flow:1.3.0.post",
+            "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+            "apex-flow-cpu:1.3.4-20261016",
         )
 
     def test_combo_validator_has_no_property_cli(self):

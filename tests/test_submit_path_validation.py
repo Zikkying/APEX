@@ -48,11 +48,11 @@ class TestSubmitPathValidation(unittest.TestCase):
     def test_lammps_phonon_image_matches_validated_phonolammps_runtime(self):
         self.assertEqual(
             LAMMPS_PHONON_IMAGE,
-            "registry.dp.tech/dptech/dp/native/prod-16664/"
-            "dpa4-phonolammps:0.0.2",
+            "registry.dp.tech/dptech/dp/native/prod-397953/397637/"
+            "apex-deepmd-gpu:3.1.3-20261016",
         )
 
-    def test_lammps_phonon_forces_validated_image(self):
+    def test_lammps_phonon_preserves_configured_image(self):
         selected = _select_run_image(
             "lammps",
             {
@@ -61,9 +61,9 @@ class TestSubmitPathValidation(unittest.TestCase):
             },
             "registry.dp.tech/dptech/deepmd-kit:3.1.3",
         )
-        self.assertEqual(selected, LAMMPS_PHONON_IMAGE)
+        self.assertEqual(selected, "registry.dp.tech/dptech/deepmd-kit:3.1.3")
 
-    def test_lammps_gruneisen_forces_validated_image(self):
+    def test_lammps_gruneisen_preserves_configured_image(self):
         selected = _select_run_image(
             "lammps",
             {
@@ -72,7 +72,7 @@ class TestSubmitPathValidation(unittest.TestCase):
             },
             "registry.dp.tech/dptech/deepmd-kit:3.1.3",
         )
-        self.assertEqual(selected, LAMMPS_PHONON_IMAGE)
+        self.assertEqual(selected, "registry.dp.tech/dptech/deepmd-kit:3.1.3")
 
     def test_cpu_lammps_phonon_keeps_configured_image(self):
         configured = (

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reuse a working image runtime; bootstrap only missing/older APEX versions."""
+"""Validate the preinstalled image runtime without modifying its environment."""
 
 import re
 import subprocess
@@ -7,12 +7,7 @@ import sys
 from importlib import metadata
 
 
-REQUIRED_VERSION = "1.3.3"
-# Immutable source includes the accepted OpenAPI runtime fixes.
-BOOTSTRAP_SOURCE = (
-    "https://github.com/Zikkying/APEX/archive/"
-    "7d867f4e8ef06e22708b0e151cc48571c4bf53a0.tar.gz"
-)
+REQUIRED_VERSION = "1.3.4"
 
 
 def release_version(value):
@@ -28,14 +23,10 @@ def ensure_apex():
         installed = None
     version = release_version(installed) if installed else None
     if version is None or version < release_version(REQUIRED_VERSION):
-        print(
-            f"APEX {installed or 'missing'}: installing verified APEX from {BOOTSTRAP_SOURCE}",
-            flush=True,
-        )
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--no-cache-dir",
-             BOOTSTRAP_SOURCE],
-            check=True,
+        raise RuntimeError(
+            f"APEX {installed or 'missing'}: require a prebuilt APEX >= {REQUIRED_VERSION} "
+            "image. Regenerate the configuration and replace the outer/make-post image; "
+            "do not install packages during job startup."
         )
     else:
         print(f"Reusing image APEX {installed}; no package installation.", flush=True)
@@ -58,6 +49,6 @@ def ensure_apex():
 if __name__ == "__main__":
     try:
         sys.exit(ensure_apex())
-    except (subprocess.CalledProcessError, OSError) as exc:
+    except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
         print(f"APEX runtime is unusable: {exc}", file=sys.stderr)
         sys.exit(1)
