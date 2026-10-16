@@ -51,7 +51,10 @@ The generator supplies the matching machine, model hashes and absolute commands.
 
 ## 3. Validate and submit
 
-Run in the generated job directory:
+Use an environment with APEX and its scientific dependencies. If the MM Agent
+environment lacks APEX, stage the task and skill helpers in the APEX/CPU image
+and run the [preflight procedure](reference/submission.md#preflight-in-the-apexcpu-image)
+there. Run in the generated job directory:
 
 ```bash
 python <skill-root>/scripts/validate_inputs.py --param param.json --global global.json
@@ -59,7 +62,8 @@ python <skill-root>/scripts/validate_inputs.py --param param.json --global globa
 
 Proceed after `Validation PASSED`. Check the image/machine pairing with
 `scripts/validate_apex_combo.py check` using the generated values and profile.
-For `gamma_surface`, run `apex preview param.json` and resolve geometry errors.
+For Gamma preview requests and `gamma_surface`, run `apex preview param.json`
+in that same environment and review the geometry report.
 
 Cloud/MatMaster submits an outer Bohrium job on `c1_m2_cpu` using the APEX/CPU
 image. Its client validates preinstalled APEX >= 1.3.4 with `ensure_apex.py`,
