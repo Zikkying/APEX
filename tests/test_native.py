@@ -107,3 +107,22 @@ def test_cli_stdout_is_json_when_calculator_prints(tmp_path):
                            str(manifest), '--task', task['task_id']], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout)['ok']
+
+
+def test_native_tongqi_generator_pins_image_and_model_without_ticket(tmp_path):
+    structure = tmp_path / 'POSCAR'
+    structure.write_text('Al\n1\n4.05 0 0\n0 4.05 0\n0 0 4.05\nAl\n4\nDirect\n0 0 0\n0 .5 .5\n.5 0 .5\n.5 .5 0\n')
+    generator = Path(__file__).resolve().parents[1] / 'apex/skills/apex-flow/scripts/generate_config.py'
+    output = tmp_path / 'job'
+    proc = subprocess.run([sys.executable, str(generator), 'create', '--execution', 'native',
+                           '--backend', 'lammps', '--runtime-profile', 'dpa4-alloytongqi-l20',
+                           '--structure', str(structure), '--properties', 'eos', '--flow-type', 'relax',
+                           '--output-dir', str(output)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    runtime = json.loads((output / 'runtime.json').read_text())
+    manifest = json.loads((output / 'tasks.json').read_text())
+    assert '@sha256:' in runtime['image']
+    assert runtime['phonolammps_command'].startswith('/usr/local/bin/dpa4-phonolammps ')
+    assert manifest['tasks'][0]['environment_files']
+    assert not (output / 'global.json').exists()
+    assert 'ticket' not in runtime

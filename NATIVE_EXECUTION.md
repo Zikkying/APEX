@@ -28,9 +28,10 @@ The dflow RunLAMMPS OP delegates to the same standalone LammpsRunner.
 Development work, not a released package/image. CPU EAM relaxation and all 15
 properties ran in real bohr sandboxes; phonon/Grüneisen were rerun after preserving
 mutable inputs. These are short transport/execution smoke cases, not convergence
-studies. General DeePMD GPU relaxation ran and was postprocessed. The attempted
-full GPU property batch encountered a DNS failure before launch and expired;
-that batch and alloytongqi native qualification remain incomplete.
+studies. General DeePMD GPU and alloytongqi L20 relaxation plus all 15 properties also
+ran and were postprocessed. An earlier GPU launch failed on DNS and expired;
+the subsequent new-resource retry passed. Runtime source overlays were used;
+this does not qualify a newly published image.
 
 Unit/regression evidence and per-property runtime receipts are recorded by the
 cross-repository delivery report. MatMaster Test deployment, real Agent evaluation

@@ -121,7 +121,10 @@ def export_tasks(parameter, stage, command="lmp -in in.lammps", runtime=None):
                     dependency = Path(conf) / "relaxation/relax_task/result.json"
                     dependencies = {dependency.as_posix(): digest(dependency)} if stage == "props" and dependency.exists() else {}
                     dependencies.update(preview_dependency)
-                    environment_files = {interaction["model"]: interaction["model_sha256"]} if interaction.get("model_in_image") and interaction.get("model_sha256") else {}
+                    model_hash = interaction.get("runtime_model_sha256", interaction.get("model_sha256"))
+                    if interaction.get("model_in_image") and not model_hash:
+                        raise ValueError("Image-resident model requires runtime_model_sha256")
+                    environment_files = {interaction["model"]: model_hash} if interaction.get("model_in_image") and model_hash else {}
                     spec = dict(environment_files=environment_files, stage=stage, property=kind, directory=relative, command=run_command,
                                 inputs=inputs, dependencies=dependencies, required_outputs=required_outputs,
                                 outputs=outputs, mutable_inputs=["POSCAR"] if kind in {"phonon", "gruneisen"} else [],

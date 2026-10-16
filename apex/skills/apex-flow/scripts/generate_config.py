@@ -2204,6 +2204,8 @@ def main():
     if args.execution == "native":
         if args.backend != "lammps":
             raise ValueError("Native execution currently supports LAMMPS")
+        if runtime_profile:
+            from dpa4_profile import dpa4_image_name
         image = dpa4_image_name(runtime_profile) if runtime_profile else (args.lammps_image or select_lammps_image(args.potential))
         global_config = {"image": image, "command": args.run_command or (
             "/usr/local/bin/dpa4-lmp -in in.lammps" if runtime_profile else ("/usr/local/bin/apex-lmp -in in.lammps" if args.potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
