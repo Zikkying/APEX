@@ -7,3 +7,5 @@
 - Fix the skill YAML frontmatter so MatMaster can load the updated instructions.
 
 Runtime validation and scientific scope are recorded in `images/runtime-20261016/qualification.json`. Runtime success does not establish convergence or compatibility with every model and GPU.
+
+- Use absolute phonoLAMMPS executable paths for the new images so sandbox login-shell PATH resets cannot break phonon/Gruneisen submission.

@@ -28,7 +28,7 @@
         "force_converged": false
       }
     ],
-    "scope": "Fresh-image L20 sandbox calculator runtime; not a full GPU dflow workflow or universal model qualification",
+    "scope": "Fresh-image L20 calculator tests plus APEX/OpenAPI static make/run/post/retrieval; not universal model/GPU or scientific convergence qualification",
     "input_sha256": {
       "tf_model": "a75cb7b7f9c205aca57d5f9562ff8e1ef9d61c90dae877a2a4c9b31fde22cc32",
       "pt_model": "055fbbcb83c9063f7809a74803c600eb34cf0b3f7caf15e0e0d2b86834f30e8e",
@@ -43,7 +43,27 @@
       "bohr_id": 20904086,
       "status": "cancelled_after_resource_rescheduling",
       "calculator_acceptance": false
-    }
+    },
+    "openapi_workflow": {
+      "workflow": "apex-deepmd-runtime-20261016-relax-7hp89",
+      "phase": "Succeeded",
+      "retrieved": true,
+      "archive": true,
+      "task_statuses": [
+        "succeeded"
+      ],
+      "inner_job": {
+        "jobId": "6a1e08c8abb64aeaa0f1e9536849d40a",
+        "status": 2,
+        "statusReason": "job_succeeded",
+        "spendTime": 40,
+        "errorMessage": "",
+        "machineType": "c16_m120_1 * NVIDIA L20",
+        "imageName": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+        "exitCode": 0
+      }
+    },
+    "phonolammps_run_command": "/opt/deepmd-kit-3.1.3/bin/phonolammps {input_file} -c {poscar} --dim {dim} {primitive_axes}"
   },
   "cpu": {
     "image": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
@@ -106,6 +126,26 @@
       "imageName": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
       "exitCode": 0
     },
-    "scope": "Fresh-image small-cell runtime acceptance; no supercell/convergence or full property benchmark claim"
+    "scope": "Fresh-image small-cell gamma and phonon runtime plus APEX/OpenAPI joint gamma make/run/post/retrieval; not a supercell/convergence or full property benchmark",
+    "openapi_workflow": {
+      "workflow": "apex-cpu-runtime-20261016-joint-7cqgt",
+      "phase": "Succeeded",
+      "retrieved": true,
+      "archive": true,
+      "task_statuses": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ],
+      "gamma_j_m2": [
+        0.0,
+        0.5335258684441107,
+        0.015185347376445611,
+        0.0
+      ]
+    },
+    "phonolammps_run_command": "/opt/apex-venv/bin/phonolammps {input_file} -c {poscar} --dim {dim} {primitive_axes}"
   }
 }
