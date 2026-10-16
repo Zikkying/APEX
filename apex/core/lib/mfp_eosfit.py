@@ -11,7 +11,7 @@ import numpy as np
 import scipy.integrate as INT
 from scipy.interpolate import *
 from scipy.optimize import curve_fit, fsolve, leastsq, minimize, root
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 kb = 1.3806488e-23  # J K^-1

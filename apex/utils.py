@@ -1,3 +1,4 @@
+from __future__ import annotations
 #!/usr/bin/env python3
 import logging
 import os
@@ -9,11 +10,7 @@ import random
 from typing import Type, List
 from monty.serialization import loadfn
 from decimal import Decimal
-from dflow.python import OP
-from dflow.python import upload_packages
-from fpop.abacus import RunAbacus
-from apex.op.RunLAMMPS import RunLAMMPS
-from apex.op.RunVASP import RunVASP
+from apex.optional_workflow import upload_packages
 from apex.account import merge_bohrium_defaults
 from apex.core.calculator import LAMMPS_INTER_TYPE
 
@@ -216,6 +213,10 @@ def get_flow_type(d: dict) -> str:
 
 
 def get_task_type(d: dict) -> (str, Type[OP]):
+    from fpop.abacus import RunAbacus
+    from apex.op.RunLAMMPS import RunLAMMPS
+    from apex.op.RunVASP import RunVASP
+
     interaction_type = d['interaction']['type']
     if interaction_type == 'vasp':
         task_type = 'vasp'

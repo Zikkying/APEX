@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import re
 import logging
@@ -7,20 +8,34 @@ import time
 import json
 from typing import List
 
-from dflow import (
-    Workflow,
-    query_workflows,
-    download_artifact,
-    config,
-)
+
 
 from apex import (
     header,
     __version__,
 )
-from apex.config import Config
 from apex.utils import load_config_file
 from apex.task_failure import classify_apex_task_status
+
+
+def __getattr__(name):
+    if name in {"Workflow", "query_workflows", "download_artifact", "config", "Config"}:
+        from apex.optional_workflow import enable_workflow
+        enable_workflow()
+        if name == "Config":
+            from apex.config import Config
+            return Config
+        import dflow
+        return getattr(dflow, name)
+    raise AttributeError(name)
+
+
+def Workflow(*args, **kwargs):
+    return __getattr__("Workflow")(*args, **kwargs)
+
+
+def download_artifact(*args, **kwargs):
+    return __getattr__("download_artifact")(*args, **kwargs)
 
 
 def parse_args():
@@ -114,7 +129,7 @@ def parse_args():
     parser_do.add_argument(
         "-c", "--config",
         type=str, nargs='?',
-        default='./global.json',
+        default=None,
         help="The json file to config the dpdispatcher",
     )
 
@@ -667,6 +682,8 @@ def parse_args():
 
 
 def config_dflow(config_file: os.PathLike) -> None:
+    from apex.config import Config
+
     # config dflow_config and s3_config
     config_dict = load_config_file(config_file)
     wf_config = Config(**config_dict)
@@ -1158,7 +1175,7 @@ def _is_retrievable_result_step_key(key: str) -> bool:
 
 
 def _should_retrieve_failure_artifacts(debug_requested: bool = False) -> bool:
-    return bool(debug_requested or config.get("mode") == "debug")
+    return bool(debug_requested or __getattr__("config").get("mode") == "debug")
 
 
 def _download_failure_artifacts_for_step(wf_info, root_step, key, work_dir):
@@ -1293,10 +1310,19 @@ def _is_workflow_failure_summary(exc: Exception) -> bool:
 
 
 def main():
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "native":
+        from apex.native import main as native_main
+        raise SystemExit(native_main(sys.argv[2:]))
     # logging
     logging.basicConfig(level=logging.INFO)
     # parse args
     parser, args = parse_args()
+    if args.cmd not in {'do', 'preview', 'rss', 'skill', 'account', 'native', None}:
+        global Workflow, query_workflows, download_artifact, config
+        from apex.optional_workflow import enable_workflow
+        enable_workflow()
+        from dflow import Workflow, query_workflows, download_artifact, config
     if args.cmd == 'submit':
         from apex.submit import submit_from_args
 

@@ -21,7 +21,6 @@ from apex.core.property.Annealing import Annealing
 from apex.core.property.MeltingPoint import MeltingPoint
 from apex.core.lib.utils import create_path
 from apex.core.lib.util import collect_task
-from apex.core.lib.dispatcher import make_submission
 from apex.utils import (
     sepline,
     get_task_type,
@@ -29,7 +28,7 @@ from apex.utils import (
     apex_task_succeeded,
     all_apex_task_status_succeeded,
 )
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 lammps_task_type = ['deepmd', 'eam_alloy', 'meam', 'eam_fs', 'meam_spline', 'snap', 'gap', 'rann', 'mace']
@@ -143,6 +142,7 @@ def worker(
     inter_type,
     task_type,
 ):
+    from apex.core.lib.dispatcher import make_submission
     run_tasks = [os.path.basename(ii) for ii in all_task]
     machine = mdata.get("machine", None)
     resources = mdata.get("resources", None)

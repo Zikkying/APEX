@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from monty.serialization import dumpfn, loadfn
 
 from apex.core.calculator.calculator import make_calculator
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

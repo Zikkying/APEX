@@ -11,7 +11,7 @@ from apex.core.calculator.Task import Task
 from apex.core.calculator.lib import vasp_utils
 from apex.core.calculator.lib.vasp_utils import incar_upper
 from apex.utils import sepline
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

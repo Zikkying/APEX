@@ -22,7 +22,7 @@ from apex.core.calculator.lib.lammps_utils import is_deepmd_pt2
 from apex.core.property.Property import Property
 from apex.core.refine import make_refine
 from apex.core.reproduce import make_repro, post_repro
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

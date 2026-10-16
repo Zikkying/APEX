@@ -7,7 +7,7 @@ import requests
 from apex.core.calculator.lib import abacus_utils, lammps_utils, vasp_utils
 from apex.core.calculator import LAMMPS_INTER_TYPE as lammps_task_type
 from apex.core.lib.utils import cmd_append_log
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

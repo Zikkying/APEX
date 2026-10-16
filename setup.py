@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="apex-flow",
-    version="1.3.4",
+    version="1.4.0.dev0",
     author="Zhuoyuan Li, Tongqi Wen",
     author_email="zhuoyli@outlook.com",
     description="Alloy Properties EXplorer using simulations",
@@ -31,21 +31,19 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "numpy<2.0.0",
-        "pydflow>=1.7.83",
         "pymatgen>=2023.8.10",
         'pymatgen-analysis-defects>=2023.8.22',
         "dpdata==0.2.17",
-        "dpdispatcher",
         "monty",
         "phonopy",
         "plotly",
         "dash",
         "dash_bootstrap_components",
         "seekpath",
-        "fpop>=0.0.7",
         "boto3",
         "pymongo"
     ],
+    extras_require={"workflow": ["pydflow>=1.7.83", "dpdispatcher", "fpop>=0.0.7"]},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",

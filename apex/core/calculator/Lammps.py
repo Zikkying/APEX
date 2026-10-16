@@ -18,7 +18,7 @@ from apex.core.calculator.lib.lammps_utils import (
     inter_nep
 )
 from .Task import Task
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from . import LAMMPS_INTER_TYPE
 upload_packages.append(__file__)
 

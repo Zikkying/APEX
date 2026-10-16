@@ -1,6 +1,6 @@
 import numpy as np
 
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 cartesian_ortho_norm_basis = np.array([ [1.0, 0.0, 0.0], \

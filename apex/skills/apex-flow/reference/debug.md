@@ -115,3 +115,25 @@ all phonon/MD workflows. Keep these statuses and receipts intact.
 The published addresses are Bohrium registry images and may require project
 access. Docker Hub publication is not yet verified. Install the current MM ZIP,
 reload the skill and regenerate configuration for a new task.
+
+## Native tasks and managed sandboxes
+
+`apex native` is independent of dflow, DPDispatcher and platform credentials.
+Its manifests contain task inputs, SHA-256 digests, commands, required outputs,
+relaxation dependencies and runtime requirements. `pack` materializes input
+symlinks. Keep scientific inputs and downloaded results together for `post`.
+
+Phonon and Grüneisen scripts intentionally transform POSCAR. Native execution
+preserves `.apex-inputs/POSCAR`, records the derived digest in task status, and
+checks both during postprocessing. Do not replace these records by hand.
+
+A `.apex-native.lock` surviving interruption requires reconciliation; it is not
+proof of a live process. Preserve the failed attempt and prepare a fresh workspace
+for a manual retry after confirming no corresponding process is running.
+`--result report.json` writes structured run/check output separately from logs.
+
+MM persists resource and execution intents separately. Its SQL migration must be
+applied before enabling `MATMASTER_MANAGED_SANDBOX_ENABLED=1` in API, Worker and
+monitor. Restarted monitors reconcile pending records. A missing sandbox marks
+unfinished computation lost; it does not convert it to success. Credentials are
+injected by the platform, never written to task manifests or artifacts.

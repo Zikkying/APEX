@@ -1,110 +1,76 @@
 ---
 name: apex-flow
-description: Run APEX 15-property materials workflows with LAMMPS, ABACUS or VASP, including relaxation, elastic constants, EOS, defects, stacking faults, phonons, finite-temperature properties and RSS structures.
+description: "Prepare, check and analyze APEX relaxation and 15-property LAMMPS tasks: Gamma, phonons, Grüneisen, defects, finite-temperature, annealing and melting. Use ManagedSandbox in MatMaster; retain optional VASP/ABACUS workflows."
 ---
 
 # APEX Flow
 
-Use APEX for automated structure preparation, relaxation, property calculations
-and result collection. Follow the workflow below; consult the linked reference
-for the selected property or calculator.
+APEX provides 15-property workflows and prepares structures and calculator inputs, checks results and computes
+properties. In MatMaster, use `ManagedSandbox` for bohr compute resources and
+execution. Use the matching APEX package and [runtime image](reference/runtime-images.md).
 
-## 1. Select the calculation
+## Prepare
 
-Use the user's selected backend, model and property parameters. Clarify missing
-scientific choices and show the effective property JSON before submission.
-Read the structure's formula, atom count, lattice and existing supercell size;
-choose the final size required by the property.
+Read the structure's composition, lattice, atom count and existing supercell.
+Choose the user's model and property settings; show effective parameters and
+separate a small smoke test from a converged scientific calculation.
 
-| Calculation | Runtime choice |
-|---|---|
-| Classical EAM/MEAM | CPU runtime |
-| Compatible DeePMD TensorFlow/PyTorch model | General DeePMD GPU runtime on L20 |
-| DPA4-alloytongqi | `--runtime-profile dpa4-alloytongqi-l20` |
-| ABACUS | ABACUS backend with pseudopotentials/orbitals |
-| VASP | User-authorized licensed image and POTCARs |
-
-[Runtime images](reference/runtime-images.md) lists exact images and commands.
-For tongqi, the profile supplies its image-resident `.pt2`; the bundled
-`models/DPA4-alloytongqi/model.pt` records source provenance.
-
-## 2. Generate the job
-
-Cloud/MatMaster uses `BOHRIUM_ACCESS_KEY` and `BOHRIUM_PROJECT_ID` (or
-`--project-id`). From the skill root, inspect supported arguments:
+From this skill directory:
 
 ```bash
 python scripts/generate_config.py create --help
 python scripts/generate_config.py describe-parameters
 ```
 
-Use `create` with the selected backend, structures, model and property JSON.
-It stages inputs and writes `param.json` and `global.json`, including
-`bohrium_config.ticket`. Set `"type_map": "auto"`; `apex submit` expands it.
-For a saved task, `refresh-global --global global.json` refreshes credentials
-while preserving the property parameters. Generate the ticket before packaging.
+For LAMMPS use `create --execution native` with structures, potential/model and
+property options. It writes `param.json`, `runtime.json` and `tasks.json`.
+Native preparation needs no cloud credentials or `global.json`. `"type_map": "auto"`
+is normalized in the shared preparation layer. For alloytongqi select
+`--runtime-profile dpa4-alloytongqi-l20`; preserve its pinned model and environment.
+`models/DPA4-alloytongqi/model.pt` records source provenance.
 
-Choose LAMMPS accuracy with `--accuracy screening`, `balanced`, or `precise`
-(default). Review the generator's effective settings and expected task count.
-For tongqi OpenAPI, select `--runtime-profile dpa4-alloytongqi-l20 --sandbox`.
-The generator supplies the matching machine, model hashes and absolute commands.
+Run relaxation first. Download its outputs and run `apex native post param.json
+tasks.json` before preparing properties that depend on the relaxed structure.
+Use `apex native prepare param.json --stage props --runtime runtime.json` for the
+next stage. Commands can be inspected with `apex native --help`.
 
-## 3. Validate and submit
+For Gamma, run `apex preview param.json --check-only` and inspect composition,
+parent mapping, slip groups, frame displacement, overlap and vacuum diagnostics.
+Gamma line requires fixed in-plane positions, normal relaxation and a fixed cell.
+Native manifests also bind checks of the actual task structures by digest.
+Resolve failed checks and explain unknown checks before calculation.
 
-Run in the generated job directory:
+## Compute in MatMaster
 
-```bash
-python <skill-root>/scripts/validate_inputs.py --param param.json --global global.json
-```
+1. `ManagedSandbox(action="create", request_id=..., image=..., cpu=... or gpu=...)`.
+   Reuse a ready resource with the same runtime within the run.
+2. `upload` the workspace-relative `tasks.json` with its `resource_id`.
+3. `execute` each manifest `task_id` with a stable `request_id`. Execution returns
+   immediately; serial execution on each resource is the default.
+4. Query `status` and `logs`; after a terminal state, `download` to a workspace
+   result directory. A live sandbox or vanished PID is not calculation success.
+5. Run `apex native check` and `post` on collected files, then analyze results.
+6. `stop` targets an execution; `delete` reclaims the resource after collecting
+   outputs and diagnostics. Confirm deletion through `status`.
 
-Proceed after `Validation PASSED`. Check the image/machine pairing with
-`scripts/validate_apex_combo.py check` using the generated values and profile.
-For `gamma_surface`, run `apex preview param.json` and resolve geometry errors.
+If a response is lost, repeat the same operation ID or query status. Never invent
+another ID to retry an uncertain start. If ManagedSandbox is unavailable, report
+that integration dependency; do not bypass tracked lifecycle controls with Bash.
+Parameter/input changes require a new manifest revision and new computation.
 
-Cloud/MatMaster submits an outer Bohrium job on `c1_m2_cpu` using the APEX/CPU
-image. Its client validates preinstalled APEX >= 1.3.4 with `ensure_apex.py`,
-then runs `python -m apex submit param.json -c global.json`. Keep the client
-running for monitoring and automatic retrieval. The `--sandbox` option selects
-the inner OpenAPI calculator backend. Use the complete run script in
-[Submission](reference/submission.md).
+## Analyze
 
-Installed local editions read `reference/execution-profile.md` and use its
-Bohrium-direct, local-debug or Slurm/PBS submission procedure.
+Check calculator exit status, input revision, required outputs and finite values.
+Preserve task-level failures, inconclusive melting classifications and diagnostic
+logs. Explain observed values with units and sampling/convergence limits.
+Do not interpret a short smoke run as converged scientific evidence.
 
-## 4. Monitor and collect
+## Standalone and legacy
 
-Save the inner dflow workflow ID and, for Cloud/MatMaster, the outer job ID.
-Use [Workflow control](reference/workflow-control.md) for status and retrieval.
-Report success after workflow completion, result download, successful
-`apex_task_status.json` records and finite property outputs. Report convergence
-from the calculator log and the requested scientific tolerance.
-
-To stop a cloud run, terminate the inner workflow first. For a failure or stalled
-step, use [Debug](reference/debug.md) to inspect the original error and recover.
-
-## Property preparation
-
-- Prefer joint relaxation + properties for a new structure.
-- For RSS/high-entropy structures, follow [RSS](reference/rss_workflow.md), use
-  `"show_progress": false`, and inspect `rss_metadata.json` and output POSCARs.
-- For Gamma, choose the parent crystal and slip system from
-  [Properties](reference/properties.md). FCC (111) Shockley uses `[1,1,-2]`.
-  Inspect the generated slab report before running the full scan.
-- For DFT, select k-spacing, pseudopotentials and the executable using
-  [Calculators](reference/calculators.md).
-- For finite-temperature and melting calculations, use the backend and replica
-  requirements in [Properties](reference/properties.md).
-
-## References
-
-| Read when | Document |
-|---|---|
-| Selecting images and executable paths | [Runtime images](reference/runtime-images.md) |
-| Packaging and submitting | [Submission](reference/submission.md) |
-| Querying, retrieving or stopping jobs | [Workflow control](reference/workflow-control.md) |
-| Setting property parameters | [Properties](reference/properties.md) |
-| Preparing calculator inputs | [Calculators](reference/calculators.md) |
-| Choosing a LAMMPS potential | [Potentials](reference/lammps_potentials.md) |
-| Generating random solid solutions | [RSS](reference/rss_workflow.md) |
-| Following worked examples | [Examples](reference/examples.md) |
-| Diagnosing a failure | [Debug](reference/debug.md) |
+Standalone `apex native pack/run/check/post` uses the same implementation as MM.
+`apex do ... make_relax/post_relax/make_props/post_props` remains available.
+VASP/ABACUS and legacy submission use `pip install apex-flow[workflow]` in an
+appropriate environment and the [legacy submission guide](reference/submission.md).
+Legacy cloud configuration uses `BOHRIUM_PROJECT_ID` and the image/machine
+validator `scripts/validate_apex_combo.py`. Credentials stay in runtime configuration.
+Runtime details and recovery procedures are in [Debug](reference/debug.md).

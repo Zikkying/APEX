@@ -4,7 +4,7 @@ import numpy as np
 from dpdata.abacus.scf import get_cell, get_coords, get_nele_from_stru
 
 from . import vasp_utils
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from dargs.dargs import Argument
 upload_packages.append(__file__)
 

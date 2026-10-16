@@ -8,7 +8,7 @@ from monty.serialization import dumpfn
 from apex.core.calculator.lib import abacus_utils, abacus_scf
 from apex.core.calculator.Task import Task
 from apex.utils import sepline
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

@@ -161,8 +161,8 @@ class TestApexSkill(unittest.TestCase):
                     for name in names
                     if not name.endswith(".pt")
                 )
-            self.assertIn("outer Bohrium job", cloud_skill)
-            self.assertIn("bohrium_config.ticket", cloud_skill)
+            self.assertIn("ManagedSandbox", cloud_skill)
+            self.assertIn("--execution native", cloud_skill)
             self.assertIn(
                 b"registry.dp.tech/dptech/dp/native/prod-397953/397637/"
                 b"apex-deepmd-gpu:3.1.3-20261016",

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict, Union, Any, Tuple
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from apex.core.lib.trans_tools import (plane_miller_bravais_to_miller,
                                        direction_miller_bravais_to_miller)
 

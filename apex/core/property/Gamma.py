@@ -37,7 +37,7 @@ from apex.core.property.gamma_geometry import (
 from apex.core.lib.trans_tools import trans_mat_basis
 from apex.core.lib.trans_tools import (plane_miller_bravais_to_miller,
                                        direction_miller_bravais_to_miller)
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

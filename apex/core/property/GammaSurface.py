@@ -38,7 +38,7 @@ from apex.core.structure import (
     normalize_parent_lattice_hint,
     resolve_parent_lattice_hint,
 )
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

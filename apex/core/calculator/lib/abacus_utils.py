@@ -7,7 +7,7 @@ import numpy as np
 from pymatgen.core import Structure
 
 from . import abacus_scf
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 A2BOHR = 1.8897261254578281

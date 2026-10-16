@@ -4,8 +4,6 @@ from monty.serialization import loadfn
 from apex.core.common_equi import (make_equi, run_equi, post_equi)
 from apex.core.common_prop import (make_property, run_property, post_property)
 from apex.utils import get_flow_type, load_config_file
-from apex.archive import archive_workdir
-from apex.config import Config
 
 
 def do_step(param_dict: dict, step: str, machine_dict: dict = None):
@@ -40,6 +38,10 @@ def do_step(param_dict: dict, step: str, machine_dict: dict = None):
             post_equi(structures, inter_parameter)
             # Auto-archive to generate/update all_result.json locally (parity with `apex submit`)
             try:
+                if machine_dict is None:
+                    return
+                from apex.archive import archive_workdir
+                from apex.config import Config
                 cfg = Config(**(machine_dict or {}))
                 archive_workdir(
                     relax_param=param_dict,
@@ -72,6 +74,10 @@ def do_step(param_dict: dict, step: str, machine_dict: dict = None):
             post_property(structures, inter_parameter, param)
             # Auto-archive to generate/update all_result.json locally (parity with `apex submit`)
             try:
+                if machine_dict is None:
+                    return
+                from apex.archive import archive_workdir
+                from apex.config import Config
                 cfg = Config(**(machine_dict or {}))
                 archive_workdir(
                     relax_param=None,
@@ -87,7 +93,10 @@ def do_step(param_dict: dict, step: str, machine_dict: dict = None):
 def do_step_from_args(parameter: str, step: str, machine_file: os.PathLike = None):
     print('-------Singel Step Local Debug Mode--------')
     param_dict = loadfn(parameter)
-    mcfg = load_config_file(machine_file)
+    mcfg = load_config_file(machine_file) if machine_file else None
+    if step.startswith("make"):
+        from apex.preparation import auto_fill_type_map_from_poscar
+        auto_fill_type_map_from_poscar(param_dict, parameter)
     if step in ['make', 'run', 'post']:
         _do_step_combined(param_dict, step, mcfg)
     else:
@@ -144,6 +153,10 @@ def _do_step_combined(param_dict: dict, step: str, machine_dict: dict = None):
             post_property(structures, inter_parameter, param_dict['properties'])
         # archive once for combined post
         try:
+            if machine_dict is None:
+                return
+            from apex.archive import archive_workdir
+            from apex.config import Config
             cfg = Config(**(machine_dict or {}))
             archive_workdir(
                 relax_param=param_dict if flow in ['relax', 'joint'] else None,

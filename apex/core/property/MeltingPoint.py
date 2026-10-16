@@ -25,7 +25,7 @@ from monty.serialization import dumpfn, loadfn
 from pymatgen.core.periodic_table import Element
 
 from apex.core.property.Property import Property
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

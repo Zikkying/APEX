@@ -20,7 +20,7 @@ from apex.core.calculator.lib import vasp_utils
 from apex.core.calculator.calculator import LAMMPS_INTER_TYPE
 from apex.core.property.Property import Property
 from apex.core.property.Phonon import Phonon
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

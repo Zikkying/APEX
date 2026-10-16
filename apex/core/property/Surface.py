@@ -14,7 +14,7 @@ from apex.core.calculator.lib import vasp_utils
 from apex.core.property.Property import Property, is_failed_task_result
 from apex.core.refine import make_refine
 from apex.core.reproduce import make_repro, post_repro
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

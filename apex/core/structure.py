@@ -1,6 +1,6 @@
 import pymatgen.core
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

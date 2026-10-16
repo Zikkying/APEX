@@ -1,6 +1,6 @@
 import numpy as np
 from dpdata.periodic_table import Element
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

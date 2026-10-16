@@ -10,11 +10,10 @@ from apex.core.calculator.lib import abacus_utils
 from apex.core.lib import crys
 from apex.core.calculator.calculator import make_calculator
 from apex.core.lib.utils import create_path
-from apex.core.lib.dispatcher import make_submission
 from apex.core.mpdb import get_structure
 from apex.core.structure import StructureInfo
 from apex.utils import apex_task_succeeded
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 lammps_task_type = ['deepmd', 'eam_alloy', 'meam', 'eam_fs', 'meam_spline', 'snap', 'gap', 'rann', 'mace', 'nep']
 
@@ -138,6 +137,7 @@ def make_equi(confs, inter_param, relax_param):
 
 
 def run_equi(confs, inter_param, mdata):
+    from apex.core.lib.dispatcher import make_submission
     # find all POSCARs and their name like mp-xxx
     conf_dirs = []
     for conf in confs:

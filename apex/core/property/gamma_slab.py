@@ -7,7 +7,7 @@ import math
 from numbers import Integral, Real
 
 import numpy as np
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from pymatgen.core.structure import Structure
 from pymatgen.core.surface import SlabGenerator
 from scipy.cluster.hierarchy import fcluster, linkage

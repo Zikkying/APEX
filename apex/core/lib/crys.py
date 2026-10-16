@@ -8,7 +8,7 @@ from apex.core.constants import (
 )
 from pymatgen.core.lattice import Lattice
 from pymatgen.core.structure import Structure
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

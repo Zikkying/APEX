@@ -8,7 +8,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.ext.matproj import Composition, MPRester
 
 from apex.core.lib import crys
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 global_std_crystal = {

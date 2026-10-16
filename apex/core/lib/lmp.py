@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

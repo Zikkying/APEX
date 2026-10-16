@@ -20,7 +20,7 @@ from apex.core.property.Property import Property
 from apex.core.structure import StructureInfo
 from apex.core.refine import make_refine
 from apex.core.calculator.lib.vasp_utils import incar_upper
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

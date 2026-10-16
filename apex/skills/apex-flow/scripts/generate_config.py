@@ -1982,6 +1982,7 @@ def main():
         "--project-id", type=int,
         help="Bohrium project ID (or set BOHRIUM_PROJECT_ID)",
     )
+    create.add_argument("--execution", choices=["native", "workflow"], default="workflow", help="Native scientific inputs without workflow credentials")
     create.add_argument("--sandbox", action="store_true",
                         help="Use OpenAPI Sandbox mode (access_key auth, no ticket)")
     create.add_argument("--machine-type",
@@ -2200,7 +2201,14 @@ def main():
 
     use_sandbox = getattr(args, "sandbox", False) or os.environ.get("BOHRIUM_USE_SANDBOX") == "1"
 
-    if use_sandbox:
+    if args.execution == "native":
+        if args.backend != "lammps":
+            raise ValueError("Native execution currently supports LAMMPS")
+        image = dpa4_image_name(runtime_profile) if runtime_profile else (args.lammps_image or select_lammps_image(args.potential))
+        global_config = {"image": image, "command": args.run_command or (
+            "/usr/local/bin/dpa4-lmp -in in.lammps" if runtime_profile else ("/usr/local/bin/apex-lmp -in in.lammps" if args.potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
+        ), "resource_class": "gpu" if args.potential in GPU_POTENTIALS else "cpu", "python": "/usr/local/bin/dpa4-python" if runtime_profile else ("/usr/local/bin/apex-calculator-python" if args.potential == "deepmd" else "/opt/apex-venv/bin/python"), "phonolammps_command": runtime_profile["calculator"]["phonolammps_command"] if runtime_profile else default_phonolammps_command(image)}
+    elif use_sandbox:
         print("Building OpenAPI Sandbox config (no ticket needed)...")
         global_config = build_global_json_sandbox(
             backend=args.backend,
@@ -2375,18 +2383,19 @@ mixing_beta         0.7
     # -------------------------------------------------------------------------
     # Write configs
     # -------------------------------------------------------------------------
-    global_path = output_dir / "global.json"
-    with open(global_path, "w") as f:
-        json.dump(global_config, f, indent=4)
-    print(f"Written: {global_path}")
-    pid = validate_project_id_types(global_config)
-    print(
-        "Hard type check passed: "
-        f"program_id={pid!r} type={type(pid).__name__}; "
-        "bohrium_config.project_id="
-        f"{global_config['bohrium_config']['project_id']!r} "
-        f"type={type(global_config['bohrium_config']['project_id']).__name__}"
-    )
+    if args.execution != "native":
+        global_path = output_dir / "global.json"
+        with open(global_path, "w") as f:
+            json.dump(global_config, f, indent=4)
+        print(f"Written: {global_path}")
+        pid = validate_project_id_types(global_config)
+        print(
+            "Hard type check passed: "
+            f"program_id={pid!r} type={type(pid).__name__}; "
+            "bohrium_config.project_id="
+            f"{global_config['bohrium_config']['project_id']!r} "
+            f"type={type(global_config['bohrium_config']['project_id']).__name__}"
+        )
 
     param_path = output_dir / "param.json"
     with open(param_path, "w") as f:
@@ -2397,6 +2406,21 @@ mixing_beta         0.7
             "VASP potcar_prefix rewritten to job-relative "
             f"'{staged_prefix}' (do not keep absolute /share/... paths)."
         )
+
+    if args.execution == "native":
+        for prop in param_config.get("properties", []):
+            if prop["type"] in {"phonon", "gruneisen"}:
+                prop["lammps_run_command"] = global_config["command"]
+                prop["phonolammps_run_command"] = global_config["phonolammps_command"]
+        param_path.write_text(json.dumps(param_config, indent=2) + "\n")
+        runtime_path = output_dir / "runtime.json"
+        runtime_path.write_text(json.dumps(global_config, indent=2) + "\n")
+        from apex.native import prepare, write_json, working_directory
+        stage = "relax" if args.flow_type in {"relax", "joint"} else "props"
+        manifest = prepare(param_path, stage, global_config["command"], global_config)
+        write_json(output_dir / "tasks.json", manifest)
+        print(f"Native inputs ready: {output_dir}; execute tasks via managed bohr sandbox")
+        return
 
     # Verify the image runtime before submitting with the same interpreter.
     shutil.copyfile(Path(__file__).with_name("ensure_apex.py"),

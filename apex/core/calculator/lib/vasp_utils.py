@@ -7,7 +7,7 @@ from pymatgen.io.vasp import Incar, Kpoints, Potcar
 
 from apex.core.lib import util
 #from apex.calculator.lib.vasp import incar_upper
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

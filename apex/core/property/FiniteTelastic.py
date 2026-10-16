@@ -17,7 +17,7 @@ from pymatgen.analysis.elasticity.elastic import ElasticTensor
 
 from apex.core.property.Property import Property
 from apex.core.refine import make_refine
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 upload_packages.append(__file__)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from pymatgen.core import Structure
 from scipy.optimize import linear_sum_assignment
 

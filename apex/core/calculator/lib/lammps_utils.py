@@ -10,7 +10,7 @@ from packaging.version import Version
 
 from apex.core.lib import util
 from apex.core.constants import PERIOD_ELEMENTS_BY_SYMBOL
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 upload_packages.append(__file__)
 
 

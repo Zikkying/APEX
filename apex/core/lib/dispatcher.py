@@ -7,7 +7,7 @@ from dpdispatcher import (
     Submission,
     Task
 )
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 from apex.core.lib.vasp_runtime import (
     build_kpoint_aware_vasp_command,
     is_switchable_vasp_command,

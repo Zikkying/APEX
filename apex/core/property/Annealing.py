@@ -9,7 +9,7 @@ import numpy as np
 from monty.serialization import dumpfn, loadfn
 from pymatgen.core.lattice import Lattice
 from pymatgen.core.structure import Structure
-from dflow.python import upload_packages
+from apex.optional_workflow import upload_packages
 
 from apex.core.property.Property import Property
 from apex.core.calculator.lib import vasp_utils
