@@ -878,6 +878,47 @@ views with a slab-normal component.
 apex preview gammaline.json
 ```
 
+Gamma previews also save `*.preview.json` and `*.preview.md` diagnostics.
+All structure-glob matches are checked, with separate output names even when
+directories have the same basename. Reports include source hashes, resolved
+parameters, cell metrics, vacuum dimensions, displacement checks, atom groups,
+and layer-by-layer element counts. Atom IDs refer to the exported POSCAR order;
+periodic wrapping and POSCAR coordinate-frame reversals are accounted for.
+
+For small alloy cells, specify the number of layers **on each side of the
+internal fault**, and optionally the target atomic fraction over both sides:
+
+```shell
+apex preview gammaline.json --check-only --interface-layers 1 \
+  --interface-target Ti=0.1 --strict --export-structures
+```
+
+`Ti=0.1` means a 10% Ti fraction in the selected interface region, not in the
+whole cell. Targets are checked without changing chemical occupations or
+rounding to attainable atom counts. `--composition-tolerance` is an absolute
+fraction tolerance (default `1e-6`); `--layer-tolerance` is the maximum width
+of a layer in Å (default `0.2`). The report records both choices and the actual
+per-side and combined counts. Without an interface definition/target, the
+corresponding check remains `unknown`; inspect the reported layers to choose
+the appropriate region.
+
+Gamma-line checks require `cal_type=relaxation`,
+`add_fix=["true","true","false"]`, `relax_pos=true`, and
+`relax_shape=relax_vol=false`: fixed in-plane coordinates, normal ionic
+relaxation, and a fixed cell. Bulk relaxation is a separate protocol. These
+checks validate resolved configuration, not calculator execution. A later
+VASP single-point calculation on the relaxed geometries is a separate step.
+Set `require_orthogonal_cell=true` in the property to enforce the orthogonal
+protocol; preview never deforms a cell to make it orthogonal.
+
+Failures return a nonzero exit status and preserve diagnostic reports;
+`--strict` also rejects unknown check results. Warnings, such as sparse
+sampling that cannot establish the full-path maximum, remain warnings.
+`--check-only` skips GIF rendering. `--export-structures` keeps POSCARs and
+metadata in a distinct run directory referenced by the report. These checks
+use direct bulk inputs; refine/reproduce and `start_confs_path` preview modes
+are rejected explicitly rather than assigned an incorrect source history.
+
 
 Nested dictionaries (`fcc`, `bcc`, `hcp`, etc.) override the top-level parameters for the corresponding lattice type.
 For chemically disordered RSS structures that symmetry analysis classifies as

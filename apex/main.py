@@ -560,6 +560,9 @@ def parse_args():
         ),
     )
 
+    from apex.preview import add_check_arguments
+    add_check_arguments(parser_preview)
+
     ##########################################
     # GUI
     parser_gui = subparsers.add_parser(

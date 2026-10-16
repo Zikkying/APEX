@@ -311,7 +311,7 @@ class TestPreviewHelpers(unittest.TestCase):
                     )
 
                 self.assertEqual(
-                    [Path(path).name for path in outputs],
+                    [Path(path).name for path in outputs if path.endswith(".gif")],
                     ["param_slip_plane.gif", "param_parent_bc.gif"],
                 )
                 self.assertEqual(len(rendered), 2)
