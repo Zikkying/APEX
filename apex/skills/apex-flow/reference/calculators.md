@@ -111,26 +111,18 @@ CPU image (`eam_alloy`, `eam_fs`, `meam`,
 `meam_spline`):
 `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline`
 
-Use `/usr/local/bin/apex-lmp` and `/usr/local/bin/apex-calculator-python` on NVIDIA L20. MACE, NEP, GAP, RANN and SNAP require separately validated custom images. This general DeePMD runtime does not support the bundled alloytongqi DPA4 architecture; keep its dedicated profile.
-
-For provenance, an older phonoLAMMPS 3.1.3 tag was
-available from the Bohrium registry mirror at repo digest
-`sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`.
-That image reports DeepMD-kit 3.1.3 and phonoLAMMPS 0.10.1. `dp show` failed
-with `RuntimeError: Unknown model type: dpa4`, and LAMMPS aborted while
-initializing `pair_style deepmd`. Therefore the tested old runtime cannot
-execute the bundled DPA4 model. Do not submit the bundled model with that old
-image or select another image without an explicit qualified profile.
-
-> **LAMMPS phonon and Grüneisen**: the generic DeePMD GPU image includes phonoLAMMPS. Validate the requested model and phonon workflow before production. The dedicated tongqi profile provides its own fixed phonoLAMMPS wrapper.
+Use the image-specific absolute entrypoints in [Runtime images](runtime-images.md).
+For alloytongqi, select `--runtime-profile dpa4-alloytongqi-l20`.
+For other potential families, supply a validated custom runtime.
+[Debug](debug.md) provides loader and environment diagnostics.
 
 ### Bundled DPA4 model (`models/`)
 
-The skill ships one DeePMD model and no alternate checkpoint downloader:
+The skill ships the alloytongqi source checkpoint:
 
 | Path | Format | Use |
 |------|--------|-----|
-| `models/DPA4-alloytongqi/model.pt` | Single-task DPA4 PyTorch checkpoint (30,403,297 bytes) | Source identity/provenance only; never the image-profile LAMMPS input |
+| `models/DPA4-alloytongqi/model.pt` | Single-task DPA4 PyTorch checkpoint (30,403,297 bytes) | Source checkpoint provenance |
 
 Safe static inspection confirms a valid PyTorch ZIP checkpoint with
 `model_params.type=dpa4`, fitting type `dpa4_ener`, and an empty

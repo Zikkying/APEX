@@ -18,10 +18,9 @@ Use the complete address in a configuration.
 | General DeePMD GPU calculator | `apex-deepmd-gpu:3.1.3-20261016` | L20; tested TF `.pb` and DPA-3.2 PyTorch `.pth`; GPU OpenAPI relaxation workflow |
 | DPA4-alloytongqi calculator | `dpa4-alloytongqi-l20:20261015-slim02` | Pinned L20 profile; 108-atom FeCoNi static OpenAPI make/run/post/retrieval/archive; full benchmark pending |
 
-The general DeePMD image cannot load the bundled alloytongqi DPA4 architecture.
 Use `--runtime-profile dpa4-alloytongqi-l20` for that checkpoint. Preserve its
 image digest, image-resident `.pt2` hash, Python wrapper and single-L20 checks.
-Do not substitute another model or infer convergence from successful execution.
+Use the selected model and verify convergence from calculator outputs.
 
 | Runtime | LAMMPS | Scientific Python | phonoLAMMPS executable |
 |---|---|---|---|
@@ -31,14 +30,12 @@ Do not substitute another model or infer convergence from successful execution.
 
 LAMMPS commands append `-in in.lammps`. Each phonoLAMMPS command appends
 `{input_file} -c {poscar} --dim {dim} {primitive_axes}`. Use the generator's
-complete commands, including its environment settings. Do not shorten commands
-to bare `python3`, `lmp`, or `phonolammps`: shell PATH can select the wrong
-environment. Runtime jobs must not install or upgrade scientific packages.
+complete commands, including its environment settings. The generated absolute paths select the image’s preinstalled scientific environment.
 Keep `type_map: "auto"` expansion through `apex submit`; direct Python submission
-must perform the same preprocessing rather than pass the literal string onward.
+uses the same preprocessing helper described in [Debug](debug.md).
 
 For L20, native job SKU is `1 * NVIDIA L20_48g`; the OpenAPI sandbox SKU is
-`c16_m120_1 * NVIDIA L20`. Do not interchange them or silently fall back to CPU.
+`c16_m120_1 * NVIDIA L20`. Use the identifier for the selected backend.
 The outer client may be CPU even when the inner calculator requires a GPU.
 T4 was absent from the sandbox catalog checked on 2026-10-15; query current
 availability before allocating resources.
@@ -55,15 +52,7 @@ availability before allocating resources.
   require separately validated custom runtimes; do not reuse the general GPU
   image merely because a model needs a GPU.
 
-## Historical references and distribution
+## Diagnostics
 
-Old `deepmd-kit-phonolammps:3.1.3`, `dpa4-phonolammps:0.0.2` and
-`apex-flow:1.3.0.post` references in build provenance, changelogs or failure
-records are historical evidence, not current recommendations. Phonon and
-Grüneisen submission must not force an old image over the selected runtime.
-Benchmark placeholders identify a new candidate to qualify, not a usable image.
-
-These addresses are Bohrium registry images. Project access may be required.
-Docker Hub publication has not been verified; do not invent public Docker Hub
-aliases. For a downloaded MM ZIP, replace/reload the installed skill and
-regenerate the configuration before submitting a new job.
+See [Debug](debug.md) for runtime compatibility, acceptance receipts,
+registry access, saved configurations and troubleshooting.

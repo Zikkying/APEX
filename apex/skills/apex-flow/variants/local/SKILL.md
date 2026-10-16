@@ -63,77 +63,19 @@ The exact installed choice is in `reference/execution-profile.md`.
    only when a consolidated `all_result.json`, database storage, or
    `apex report` is required.
 
-## Calculator Rules
+## Calculation setup
 
-- **LAMMPS + DeePMD/DPA**: treat the bundled DPA4 single-task checkpoint
-  `models/DPA4-alloytongqi/model.pt` as provenance, not a direct LAMMPS input.
-  Use `"type_map": "auto"`. The old image's Bohrium registry mirror (digest
-  `sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`)
-  fails with `Unknown model type: dpa4`, so do not submit this model with the
-  legacy LAMMPS image. The `dpa4-alloytongqi-l20` profile is release-enabled
-  with OpenAPI static make/run/post/retrieval acceptance; its full benchmark
-  remains pending. See `reference/runtime-images.md` for the current image roles.
-  It targets one L20 SM 8.9 and one MPI rank; job SKU is
-  `1 * NVIDIA L20_48g`. T4 was absent from the sandbox catalog checked on 2026-10-15.
-  Do not edit qualification status, invent a digest, or bypass validators.
-  Other GPUs, CPU production, multi-rank and multi-GPU require separate evidence.
-  Require absolute `/usr/local/bin/dpa4-lmp` and
-  `/usr/local/bin/dpa4-phonolammps` entrypoints from the generated profile.
-- **VASP**: confirm a licensed executable/image appropriate to the selected
-  profile. Verify every POTCAR locally. Cloud-only image discovery rules apply
-  only to the Bohrium profile.
-- **ABACUS/VASP k-points**: VASP must set `KSPACING`; ABACUS must set
-  `kspacing` or `cal_setting.K_POINTS`.
-- **VASP executable selection**: APEX reads each generated task `KPOINTS`.
-  Gamma-centered `1x1x1` always uses `vasp_gam`; every other grid uses
-  `vasp_std`, for all properties and relaxation. `KGAMMA=True` alone is not
-  proof. A task selected for `vasp_gam` requires `KPAR=1`. MPI ranks must
-  match the Bohrium CPU count; `KPAR` must divide ranks and `NCORE` must
-  divide ranks/KPAR. Do not combine `NCORE` with `NPAR`; a missing `NCORE`
-  is a warning.
-- Model, pseudopotential, orbital, and structure paths must be valid from the
-  execution environment; do not assume a host path exists in a container or
-  on a compute node.
+Use the selected model and backend with [Runtime images](reference/runtime-images.md).
+For tongqi, select `dpa4-alloytongqi-l20` and its image-resident model contract.
+For VASP, use the user's licensed image/executable and verified POTCARs.
+Set DFT k-spacing using [Calculators](reference/calculators.md).
 
-See `reference/calculators.md` and `reference/lammps_potentials.md`.
+Read [Properties](reference/properties.md) for property settings, supported
+backends, supercell sizes, Gamma geometry and melting replicas. Inspect the
+input atom count and the final generated size before submission.
 
-## Property Rules
+For random solid solutions, follow [RSS](reference/rss_workflow.md), set
+`"show_progress": false`, and inspect output POSCARs plus `rss_metadata.json`.
 
-- Supported types and complete defaults are in `reference/properties.md`.
-- `finite_t_elastic` and `melting_point` are LAMMPS-only.
-- `finite_t_latt` and `annealing` support LAMMPS and VASP, but not ABACUS. VASP uses `MDALGO=3` and requires a binary compiled with `-Dtbdyn`; annealing `protocol="coexistence"` is a fixed-temperature equilibration plus production run.
-- For vacancy/interstitial/phonon/Grüneisen/finite-T calculations, confirm the
-  final atom count after expansion. Avoid expanding an existing supercell
-  twice; use `[1,1,1]` after user confirmation when appropriate.
-- For gamma/gamma-surface, start from the recommended crystallographic tables
-  in `reference/properties.md`. Non-tabulated systems are allowed only when the
-  direction lies on the plane; report the warning and inspect generated
-  geometry. For disordered RSS/SQS cells, set `parent_lattice` explicitly.
-- Gamma and GammaSurface default to 20 Å vacuum. Gamma line supports explicit
-  `displacement_points`, which must include `0`; the task count is the number
-  of supplied fractions.
-- For `melting_point`, confirm temperatures, replicas, final atom count, stage
-  lengths, task count, and resources. Optional `restart_files` must contain one
-  existing file per temperature and are forwarded to each matching replica as
-  `restart.coexistence.start`; the generated input is not changed to
-  `read_restart`. `finite_t_latt` never receives this file. Missing, duplicate,
-  or disagreeing configured replicas keep the bracket `inconclusive`.
-- Generate optional Gamma overrides with the material-independent
-  `--gamma-*` arguments documented in `reference/properties.md`. Always show
-  the final Gamma JSON and expected task count before submission.
-
-## RSS
-
-For random solid solutions and high-entropy materials, read
-`reference/rss_workflow.md`. Set `"show_progress": false`, run `apex rss`, and
-judge success from generated `conf_*/POSCAR` files plus `rss_metadata.json`.
-
-## Safety
-
-- Never store credentials in `param.json`, commit them, or print passwords.
-- Never silently choose a backend, potential, VASP license resource,
-  crystallographic plane, temperature range, or cluster queue.
-- Stop on failed validation. Do not describe a workflow as successful until
-  expected result files exist.
-- To terminate a cloud workflow, terminate the inner dflow workflow before any
-  wrapper process. See `reference/workflow-control.md`.
+Use [Debug](reference/debug.md) for validation failures, runtime issues and
+result recovery. Keep credentials in the selected profile's credential store.
