@@ -1,19 +1,21 @@
-# DPA4-alloytongqi L20 runtime candidate
+# DPA4-alloytongqi L20 runtime
 
-Work in progress: not qualified for production until the published image digest
-passes the L20 v3 benchmark. Do not change the production profile based on a
-successful source-sandbox run alone.
+The production profile is release-enabled. OpenAPI static make/run/post,
+automatic retrieval and archive passed for the pinned image; see
+`openapi-acceptance.json`. The full L20 v3 benchmark and legacy job E2E remain
+pending. Static acceptance does not establish scientific convergence or
+qualification for all properties and GPUs.
 
 Published on 2026-10-15 by Bohrium build 178359:
 `registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02`
 Digest: `sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d`.
 The registry independently confirms this digest and 13,804,813,479 compressed
 layer bytes (Bohrium displays 12.86 GB). The build filesystem is 27,128,979,232
-bytes. Fresh-image L20 acceptance is pending sandbox image preparation.
+bytes. Fresh-image OpenAPI static acceptance is recorded in the receipt above.
 Earlier snapshot attempts 178312, 178321 and 178333 failed with empty logs;
 the flattened Dockerfile build resolves the publication blocker.
 
-Base: `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`.
+Historical build base (not a job-image recommendation): `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`.
 Target: single NVIDIA L20, compute capability 8.9, one MPI rank.
 Source checkpoint SHA-256:
 `c84b268cc6191afc72bd2d5c001cbe526a0d2e04ebf6dbd7df021306e9abe9ad`.

@@ -1,5 +1,7 @@
 # APEX LAMMPS Potential Types — Detailed Reference
 
+Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+
 ## Qualified OpenAPI submission
 
 `--runtime-profile dpa4-alloytongqi-l20 --sandbox` is enabled for the pinned

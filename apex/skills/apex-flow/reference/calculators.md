@@ -1,5 +1,7 @@
 # APEX Calculator Backends — Configuration Guide
 
+Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+
 ## Overview
 
 APEX supports three calculator **backends**: LAMMPS, ABACUS, and VASP.
@@ -382,7 +384,7 @@ Missing both → `RuntimeError: K point information is not defined`.
 
 ```json
 {
-    "abacus_image_name": "registry.dp.tech/dptech/abacus:3.2.3",
+    "abacus_image_name": "registry.dp.tech/dptech/abacus:3.8.2",
     "abacus_run_command": "mpirun -n 16 abacus",
     "scass_type": "c16_m32_cpu"
 }

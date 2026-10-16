@@ -232,6 +232,8 @@ This file contains parameters for geometry optimization, structure relaxation an
 ### 2.3. Global Configuration Files
 
 Global configuration files specify where and how your workflows should be executed.
+See the [current runtime image guide](apex/skills/apex-flow/reference/runtime-images.md)
+for image roles, absolute entrypoints, and validation scope.
 
 #### Configuration for Bohrium Cloud Platform
 
@@ -239,8 +241,9 @@ Create `global_bohrium.json` to submit workflows to the Bohrium cloud platform:
 
 ```json
 {
-  "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2",
-  "lammps_run_command":"lmp -in in.lammps",
+  "apex_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline",
+  "lammps_image_name": "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016",
+  "lammps_run_command":"/usr/local/bin/apex-lmp -in in.lammps",
   "scass_type":"1 * NVIDIA L20_48g"
 }
 ```
@@ -473,7 +476,7 @@ When you run `apex submit -c global_bohrium.json`, APEX auto-fills these default
 - `k8s_api_server`: `https://workflows.deepmodeling.com`
 - `batch_type`: `Bohrium`
 - `context_type`: `Bohrium` (AccessKey mode exchanges a short-lived ticket for DPDispatcher)
-- `apex_image_name`: `registry.dp.tech/dptech/dp/native/prod-397637/apex-flow:1.3.0.post`
+- `apex_image_name`: `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline`
 
 Priority rule: values in your `-c` json file override account defaults.
 
@@ -938,11 +941,13 @@ corners. Set it to `false` only when intentionally defining custom
 
 APEX integrates parts of [dflow-phonon](https://github.com/Chengqian-Zhang/dflow-phonon) and wraps [Phonopy](https://github.com/phonopy/phonopy) / [phonoLAMMPS](https://github.com/abelcarreras/phonolammps). [SeeK-path](https://seekpath.readthedocs.io/en/latest/index.html) automatically generates high-symmetry k-paths.
 
-> **Important:** LAMMPS phonon and Grüneisen workflows using GPU potentials
-> (`deepmd`, `mace`, `nep`) use
-> `registry.dp.tech/dptech/dp/native/prod-16664/dpa4-phonolammps:0.0.2`.
-> CPU potentials keep the CPU-safe `apex-flow:1.3.0.post` image; 0.0.2 must
-> not be paired with a `*_cpu` machine.
+> **Runtime selection:** LAMMPS phonon/Grüneisen calculations keep the selected
+> calculator image. Classical potentials use the CPU runtime; supported DeePMD
+> models use the general GPU runtime on L20; alloytongqi uses its dedicated
+> profile. MACE/NEP and other unsupported potentials require a custom runtime.
+> Use the absolute phonoLAMMPS commands in the
+> [runtime image guide](apex/skills/apex-flow/reference/runtime-images.md).
+> No automatic switch to the historical DPA4 image is performed.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

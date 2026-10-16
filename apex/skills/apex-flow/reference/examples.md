@@ -1,5 +1,7 @@
 # APEX Examples — Common Workflow Configurations
 
+Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+
 ## Example 1: BCC Mo with DeePMD — EOS + Elastic
 
 **Scenario**: Quick property screening of Mo using a DeePMD potential.

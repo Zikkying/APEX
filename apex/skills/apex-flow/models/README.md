@@ -20,10 +20,14 @@ type map alone.
 
 ## Runtime compatibility boundary
 
-APEX keeps this old image as both its default LAMMPS image and its forced
-LAMMPS phonon/Grüneisen image:
+Use the current image roles in [runtime-images.md](../reference/runtime-images.md).
+For this checkpoint, select `--runtime-profile dpa4-alloytongqi-l20`;
+the general DeePMD image cannot load its DPA4 architecture.
 
-`registry.dp.tech/dptech/dp/native/prod-397637/deepmd-kit-phonolammps:3.1.3`
+### Historical incompatibility evidence (not a recommendation)
+
+The legacy DeePMD 3.1.3 image was tested before the current runtime release.
+It is no longer a default or a forced phonon/Grüneisen runtime.
 
 On 2026-08-10, the configured `registry.dp.tech` endpoint was pull-denied, but
 the same repository path/tag was available from the Bohrium registry mirror.
@@ -39,12 +43,12 @@ bundled file matching the SHA-256 above:
 This proves that digest's DeepMD-kit 3.1.3 runtime cannot execute the model.
 Retain the mirror registry domain and digest when reporting provenance; the
 configured registry endpoint itself was not readable. Do not submit this model
-with the default old image. Keep that image as the general default and legacy
-phonon/Grüneisen forced runtime.
+with that legacy image. Do not restore it as a default or phonon override.
 
 The active profile is `dpa4-alloytongqi-l20`. Read its image identity and
-qualification status from `data/dpa4_alloytongqi_l20_profile.json`; only
-`post_snapshot_passed` permits production generation. T4 is absent from the
+release and qualification status from `data/dpa4_alloytongqi_l20_profile.json`.
+The release is enabled and OpenAPI static make/run/post/retrieval acceptance
+passed; the full benchmark remains pending. These are separate statuses. T4 is absent from the
 sandbox catalog checked on 2026-10-15. Historical T4 evidence and artifacts
 remain provenance and must not be reused as L20 qualification.
 
@@ -59,9 +63,10 @@ Cross-family `.pt2` reuse, CPU production, multi-rank and multi-GPU are blocked.
    it to LAMMPS.
 2. Inspect the candidate with `validate_apex_combo.py list-combos
    --runtime-profile dpa4-alloytongqi-l20`.
-3. Stop while `recommend` and `generate_config.py create --runtime-profile
-   dpa4-alloytongqi-l20` fail closed. After exact-image qualification, use the
-   generated image-resident `.pt2` contract and audited wrapper commands only.
+3. Generate with `generate_config.py create --runtime-profile
+   dpa4-alloytongqi-l20` (add `--sandbox` for the accepted OpenAPI path).
+   Use the generated image-resident `.pt2` contract and audited wrappers;
+   do not alter profile evidence or bypass compatibility validation.
    The exact wrappers are `/usr/local/bin/dpa4-lmp` and
    `/usr/local/bin/dpa4-phonolammps`.
 

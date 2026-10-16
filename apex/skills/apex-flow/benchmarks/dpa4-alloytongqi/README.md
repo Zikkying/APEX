@@ -90,6 +90,10 @@ is nevertheless observed on a GPU.
 
 ## Reproducible procedure
 
+The placeholder image below is for qualifying a new candidate, not a production
+recommendation. Current production roles are in
+[Runtime images](../../reference/runtime-images.md).
+
 Start in this benchmark directory. Use a new workspace name for every image ×
 GPU qualification; scripts refuse to overwrite evidence.
 
