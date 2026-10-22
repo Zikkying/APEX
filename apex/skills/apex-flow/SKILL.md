@@ -1,114 +1,61 @@
 ---
 name: apex-flow
-description: Run APEX 15-property materials workflows with LAMMPS, ABACUS or VASP, including relaxation, elastic constants, EOS, defects, stacking faults, phonons, finite-temperature properties and RSS structures.
+description: Run APEX 15-property materials workflows with LAMMPS, ABACUS or VASP: relaxation, elastic constants, EOS, defects, stacking faults, phonons, finite-temperature properties and RSS structures.
 ---
 
 # APEX Flow
 
-Use APEX for automated structure preparation, relaxation, property calculations
-and result collection. Follow the workflow below; consult the linked reference
-for the selected property or calculator.
+## 1. Prepare
 
-## 1. Select the calculation
+Use the user's backend, model and parameters; ask only for missing choices.
+Prefer joint relaxation + properties. Choose supercell size from the input
+atom count and the requested property.
 
-Use the user's selected backend, model and property parameters. Clarify missing
-scientific choices and show the effective property JSON before submission.
-Read the structure's formula, atom count, lattice and existing supercell size;
-choose the final size required by the property.
-
-| Calculation | Runtime choice |
+| Calculation | Runtime |
 |---|---|
-| Classical EAM/MEAM | CPU runtime |
-| Compatible DeePMD TensorFlow/PyTorch model | General DeePMD GPU runtime on L20 |
+| EAM/MEAM | APEX/CPU |
+| Compatible DeePMD TF/PyTorch | General DeePMD GPU on L20 |
 | DPA4-alloytongqi | `--runtime-profile dpa4-alloytongqi-l20` |
-| ABACUS | ABACUS backend with pseudopotentials/orbitals |
-| VASP | User-authorized licensed image and POTCARs |
+| ABACUS / VASP | ABACUS inputs / user-authorized VASP image and POTCARs |
 
-[Runtime images](reference/runtime-images.md) lists exact images and commands.
-For tongqi, the profile supplies its image-resident `.pt2`; the bundled
-`models/DPA4-alloytongqi/model.pt` records source provenance.
+Use [Runtime images](reference/runtime-images.md) for exact paths.
+`models/DPA4-alloytongqi/model.pt` records source provenance; the tongqi
+profile supplies the executable image-resident model.
 
-## 2. Generate the job
+Generate with `scripts/generate_config.py create` using the approved inputs.
+Cloud/MM uses `BOHRIUM_ACCESS_KEY` and `BOHRIUM_PROJECT_ID` (or `--project-id`);
+the generator writes `param.json`, `global.json` and `bohrium_config.ticket`.
+Set `"type_map": "auto"`. Add `--sandbox` for inner OpenAPI execution.
+Consult `create --help` or `describe-parameters` when needed.
 
-Cloud/MatMaster uses `BOHRIUM_ACCESS_KEY` and `BOHRIUM_PROJECT_ID` (or
-`--project-id`). From the skill root, inspect supported arguments:
+## 2. Check once and submit
 
-```bash
-python scripts/generate_config.py create --help
-python scripts/generate_config.py describe-parameters
-```
+Run `validate_inputs.py --param param.json --global global.json` once on the
+final inputs, then submit after `Validation PASSED`. Use the
+[submission script](reference/submission.md) to combine this check with
+`python -m apex submit param.json -c global.json`.
 
-Use `create` with the selected backend, structures, model and property JSON.
-It stages inputs and writes `param.json` and `global.json`, including
-`bohrium_config.ticket`. Set `"type_map": "auto"`; `apex submit` expands it.
-For a saved task, `refresh-global --global global.json` refreshes credentials
-while preserving the property parameters. Generate the ticket before packaging.
+If MM lacks local APEX, run the check in the APEX/CPU image as part of the
+outer Bohrium job. For a requested preview or `gamma_surface`, run
+`apex preview param.json` there first; use a separate CPU preflight job when
+the preview needs user review. The [preflight procedure](reference/submission.md#preflight-in-the-apexcpu-image)
+contains the staging and commands. Repeat checks when inputs change.
 
-Choose LAMMPS accuracy with `--accuracy screening`, `balanced`, or `precise`
-(default). Review the generator's effective settings and expected task count.
-For tongqi OpenAPI, select `--runtime-profile dpa4-alloytongqi-l20 --sandbox`.
-The generator supplies the matching machine, model hashes and absolute commands.
+Keep the submit client running for automatic result retrieval. Installed local
+editions follow `reference/execution-profile.md`.
 
-## 3. Validate and submit
+## 3. Collect
 
-Use an environment with APEX and its scientific dependencies. If the MM Agent
-environment lacks APEX, stage the task and skill helpers in the APEX/CPU image
-and run the [preflight procedure](reference/submission.md#preflight-in-the-apexcpu-image)
-there. Run in the generated job directory:
+Save the inner workflow ID and outer job ID. Confirm completion and retrieved
+property results, then report values with units and convergence status.
+Use [Workflow control](reference/workflow-control.md) for monitoring/stopping
+and [Debug](reference/debug.md) when execution or results need investigation.
 
-```bash
-python <skill-root>/scripts/validate_inputs.py --param param.json --global global.json
-```
+## Read as needed
 
-Proceed after `Validation PASSED`. Check the image/machine pairing with
-`scripts/validate_apex_combo.py check` using the generated values and profile.
-For Gamma preview requests and `gamma_surface`, run `apex preview param.json`
-in that same environment and review the geometry report.
-
-Cloud/MatMaster submits an outer Bohrium job on `c1_m2_cpu` using the APEX/CPU
-image. Its client validates preinstalled APEX >= 1.3.4 with `ensure_apex.py`,
-then runs `python -m apex submit param.json -c global.json`. Keep the client
-running for monitoring and automatic retrieval. The `--sandbox` option selects
-the inner OpenAPI calculator backend. Use the complete run script in
-[Submission](reference/submission.md).
-
-Installed local editions read `reference/execution-profile.md` and use its
-Bohrium-direct, local-debug or Slurm/PBS submission procedure.
-
-## 4. Monitor and collect
-
-Save the inner dflow workflow ID and, for Cloud/MatMaster, the outer job ID.
-Use [Workflow control](reference/workflow-control.md) for status and retrieval.
-Report success after workflow completion, result download, successful
-`apex_task_status.json` records and finite property outputs. Report convergence
-from the calculator log and the requested scientific tolerance.
-
-To stop a cloud run, terminate the inner workflow first. For a failure or stalled
-step, use [Debug](reference/debug.md) to inspect the original error and recover.
-
-## Property preparation
-
-- Prefer joint relaxation + properties for a new structure.
-- For RSS/high-entropy structures, follow [RSS](reference/rss_workflow.md), use
-  `"show_progress": false`, and inspect `rss_metadata.json` and output POSCARs.
-- For Gamma, choose the parent crystal and slip system from
-  [Properties](reference/properties.md). FCC (111) Shockley uses `[1,1,-2]`.
-  Inspect the generated slab report before running the full scan.
-- For DFT, select k-spacing, pseudopotentials and the executable using
-  [Calculators](reference/calculators.md).
-- For finite-temperature and melting calculations, use the backend and replica
-  requirements in [Properties](reference/properties.md).
-
-## References
-
-| Read when | Document |
-|---|---|
-| Selecting images and executable paths | [Runtime images](reference/runtime-images.md) |
-| Packaging and submitting | [Submission](reference/submission.md) |
-| Querying, retrieving or stopping jobs | [Workflow control](reference/workflow-control.md) |
-| Setting property parameters | [Properties](reference/properties.md) |
-| Preparing calculator inputs | [Calculators](reference/calculators.md) |
-| Choosing a LAMMPS potential | [Potentials](reference/lammps_potentials.md) |
-| Generating random solid solutions | [RSS](reference/rss_workflow.md) |
-| Following worked examples | [Examples](reference/examples.md) |
-| Diagnosing a failure | [Debug](reference/debug.md) |
+- [Properties](reference/properties.md): parameters, cell sizes, Gamma and finite-T.
+  FCC (111) Shockley direction is `[1,1,-2]`.
+- [Calculators](reference/calculators.md) / [Potentials](reference/lammps_potentials.md): engine inputs and models.
+- [RSS](reference/rss_workflow.md): structure generation with `"show_progress": false`.
+- [Examples](reference/examples.md): complete jobs.
+- Custom image/machine: `validate_apex_combo.py` and [Runtime images](reference/runtime-images.md).
