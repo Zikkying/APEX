@@ -1,7 +1,7 @@
 {
     "schema_version": 1,
     "profile_id": "dpa4-alloytongqi-l20",
-    "description": "Published alloytongqi L20 runtime; OpenAPI static make/run/post/retrieval acceptance passed.",
+    "description": "DPA4-alloytongqi L20 runtime",
     "image": {
         "ref": "registry.dp.tech/dptech/dp/native/prod-397953/397637/dpa4-alloytongqi-l20:20261015-slim02",
         "digest": "sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d"
@@ -27,8 +27,7 @@
                 "scass_type": "1 * NVIDIA L20_48g",
                 "mpi_ranks": 1,
                 "gpu_count": 1,
-                "status": "release_enabled",
-                "evidence": "Published-image OpenAPI L20 static make/run/post/retrieval/archive passed; see openapi_qualification."
+                "status": "release_enabled"
             }
         ],
         "sandbox": {
@@ -46,27 +45,10 @@
             "multi_gpu": "Only one MPI rank on one L20 is qualified.",
             "cross_arch_pt2": "Do not reuse the SM 8.9 artifact on a different architecture."
         },
-        "unverified": [
-            "RTX 4090: checkpoint inference only, no production image qualification.",
-            "RTX 5090, A100 and RTX PRO 5000: listed in sandbox catalog but not runtime-qualified.",
-            "Other L20 SKUs: require their own execution receipts."
-        ],
         "unknown_policy": "fail_closed"
     },
     "release_status": "enabled",
-    "release_evidence": {
-        "bohrium_build_id": 178359,
-        "qualification_scope": "108-atom Fe36Co36Ni36 static single point: APEX make, OpenAPI L20 run, post, automatic retrieval and local archive"
-    },
     "openapi_qualification": {
-        "status": "passed",
-        "workflow_id": "tongqi-openapi-acceptance-r5-relax-vwsb5",
-        "job_id": "b280ad3cdd284d21b1654b5dc650e2e3",
-        "scope": "108-atom Fe36Co36Ni36 static single point: APEX make, OpenAPI L20 run, post, automatic retrieval and local archive",
-        "atom_count": 108,
-        "energy_eV": -208832.37,
-        "result_sha256": "85e303a6166038894ee2f1b3c5775b67cfa278dcb0ec3cfb331c646e83536114",
-        "image_digest": "sha256:7f17cad780b88c9f5b595fa7cf3b66b91e655d11bc6ab940e10c3d1ad21bcc1d",
-        "scientific_convergence_claimed": false
+        "status": "passed"
     }
 }

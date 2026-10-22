@@ -236,7 +236,6 @@ def recommend(
                 "phonolammps_command"
             ],
             "outer_machine": RECOMMENDED_SCASS["outer"][0],
-            "evidence": combo["evidence"],
         }
 
     if backend == "lammps":
@@ -303,11 +302,11 @@ def list_combos(
             "candidate_after_publish": candidate,
             "prohibited_exact": compatibility["prohibited_exact"],
             "prohibited_classes": compatibility["prohibited_classes"],
-            "unverified": compatibility["unverified"],
+            "unverified": compatibility.get("unverified", []),
             "unknown_policy": compatibility["unknown_policy"],
             "note": (
                 "Use the recommended runtime for submission. "
-                "openapi_qualification records the completed acceptance run."
+                "The profile supplies the image, model and machine settings."
             ),
         }
     rec = recommend(backend, prefer)

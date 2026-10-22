@@ -55,22 +55,16 @@ outer client. Reconcile existing jobs before retrying to avoid duplicate work.
 
 ## Model and GPU compatibility
 
-The generic DeePMD 3.1.3 image supports the tested TF `.pb` and DPA-3.2 PyTorch
-`.pth` cases on L20. Alloytongqi requires its dedicated DPA4 profile, one L20
+Use the generic DeePMD image for compatible TF `.pb` and PyTorch `.pth`
+models on L20. Alloytongqi requires its dedicated DPA4 profile, one L20
 SM 8.9 GPU and one MPI rank. CPU production, other GPU families, multi-rank
-and multi-GPU execution require separate runtime evidence. T4 was absent from
-the sandbox catalog checked on 2026-10-15; refresh the live catalog as needed.
+and multi-GPU execution require separate runtime evidence. Query the live machine catalog when selecting resources.
 MACE, NEP, GAP, RANN and SNAP need separately validated custom images.
 
 The bundled checkpoint `models/DPA4-alloytongqi/model.pt` is source provenance;
 the runtime uses the profile's hashed image-resident `.pt2`. Preserve model
 identity, hashes and validator checks during repair. Changing a model or
 calculator changes the scientific calculation and needs the user's choice.
-
-Historical compatibility evidence: the legacy DeePMD image at digest
-`sha256:43a27ca4a7bba7f774bbd56104d205a6a80cd9d65928f249f6109e9ef37b8402`
-failed on alloytongqi with `Unknown model type: dpa4`. Historical image tags
-and benchmark placeholders are not production recommendations.
 
 ## Geometry and scientific checks
 
@@ -100,19 +94,3 @@ APEX selects `vasp_gam` for Gamma-centered 1x1x1 and `vasp_std` otherwise.
 Choose `NCORE` or `NPAR`, and initialize the image's MPI/oneAPI environment and
 stack limit. See [Calculators](calculators.md) for complete inputs.
 
-## Acceptance receipts
-
-| Runtime | Recorded evidence |
-|---|---|
-| CPU 1.3.4 | Al EAM relaxation, gamma and small phonon; OpenAPI joint workflow `apex-cpu-runtime-20261016-joint-7cqgt` |
-| General DeePMD GPU | TF/PyTorch and Ni slab runtime checks; OpenAPI `apex-deepmd-runtime-20261016-relax-7hp89` |
-| Alloytongqi | `tongqi-openapi-acceptance-r5-relax-vwsb5`: 108-atom FeCoNi static make/run/post/retrieval/archive |
-
-Tongqi is enabled for submission (`release_status: enabled`). Its published-image
-OpenAPI acceptance is recorded in `openapi_qualification`, including the tested
-composition, workflow and result hash. Use these receipts to describe the
-observed calculation; assess each requested material and property on its inputs.
-
-The published addresses are Bohrium registry images and may require project
-access. Docker Hub publication is not yet verified. Install the current MM ZIP,
-reload the skill and regenerate configuration for a new task.

@@ -8,7 +8,7 @@ from pathlib import Path
 from apex.skills import SKILL_NAME, get_skill_root
 
 # Skip noise when packing for MatMaster / agent skill upload.
-_ZIP_SKIP_DIR_NAMES = {"__pycache__", ".git", "variants"}
+_ZIP_SKIP_DIR_NAMES = {"__pycache__", ".git", "variants", "benchmarks"}
 _ZIP_SKIP_FILE_NAMES = {
     ".DS_Store",
     "global_bohrium_direct.json",

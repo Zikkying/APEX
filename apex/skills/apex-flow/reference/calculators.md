@@ -1,6 +1,6 @@
 # APEX Calculator Backends — Configuration Guide
 
-Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+Current image roles and executable paths: [Runtime images](runtime-images.md).
 
 ## Overview
 

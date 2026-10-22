@@ -1,6 +1,6 @@
 # APEX Examples — Common Workflow Configurations
 
-Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+Current image roles and executable paths: [Runtime images](runtime-images.md).
 
 ## Example 1: BCC Mo with DeePMD — EOS + Elastic
 
