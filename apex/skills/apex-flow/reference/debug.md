@@ -93,4 +93,3 @@ APEX selects `vasp_gam` for Gamma-centered 1x1x1 and `vasp_std` otherwise.
 `vasp_gam` needs `KPAR=1`; `KPAR` divides ranks and `NCORE` divides ranks/KPAR.
 Choose `NCORE` or `NPAR`, and initialize the image's MPI/oneAPI environment and
 stack limit. See [Calculators](calculators.md) for complete inputs.
-
