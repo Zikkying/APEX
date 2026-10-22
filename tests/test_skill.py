@@ -47,7 +47,8 @@ class TestApexSkill(unittest.TestCase):
         self.assertTrue(profile.is_file())
         profile_text = profile.read_text(encoding="utf-8")
         self.assertIn("dpa4-alloytongqi-l20", profile_text)
-        self.assertIn("pre_snapshot_only", profile_text)
+        self.assertNotIn("pre_snapshot_only", profile_text)
+        self.assertIn('"release_status": "enabled"', profile_text)
         self.assertIn("1 * NVIDIA L20_48g", profile_text)
         self.assertNotIn("4c-nano", profile_text)
         benchmark = root / "benchmarks" / "dpa4-alloytongqi"

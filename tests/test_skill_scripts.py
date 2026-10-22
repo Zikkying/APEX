@@ -2176,6 +2176,8 @@ class TestValidateComboAdditionalPaths(unittest.TestCase):
     def test_enabled_dpa4_profile_recommends_l20_and_rejects_other_image(self):
         data = self.combo.list_combos(runtime_profile=self.combo.DPA4_RUNTIME_PROFILE)
         self.assertEqual(data["status"], "published")
+        self.assertNotIn("qualification_status", data)
+        self.assertEqual(data["openapi_qualification"]["status"], "passed")
         self.assertIsNotNone(data["recommended"])
         ok, errors = self.combo.check_combo(
             "registry.example/dpa4:tag@sha256:" + "a" * 64,
