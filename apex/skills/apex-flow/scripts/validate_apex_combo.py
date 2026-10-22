@@ -294,7 +294,7 @@ def list_combos(
             "status": (
                 "published" if profile["published"] else "unpublished"
             ),
-            "qualification_status": profile.get("qualification_status"),
+            "openapi_qualification": profile.get("openapi_qualification"),
             "release_status": profile.get("release_status"),
             "recommended": (
                 recommend(runtime_profile=runtime_profile)
@@ -306,8 +306,8 @@ def list_combos(
             "unverified": compatibility["unverified"],
             "unknown_policy": compatibility["unknown_policy"],
             "note": (
-                "Release enablement and qualification are separate. Check "
-                "qualification_status before claiming end-to-end acceptance."
+                "Use the recommended runtime for submission. "
+                "openapi_qualification records the completed acceptance run."
             ),
         }
     rec = recommend(backend, prefer)
@@ -325,7 +325,7 @@ def list_combos(
             "General DeePMD GPU runtime targets NVIDIA L20; other GPUs need separate qualification.",
             "DPA4 image 0.0.2 is blocked on CPU machines after sequential deployment timeouts.",
             "For triclinic cells, avoid deepmd-kit:3.1.1; qualify the chosen model and actual cell on the general DeePMD runtime.",
-            "The bundled dpa4-alloytongqi-l20 profile remains fail-closed until its immutable image ref@digest passes post-snapshot qualification.",
+            "For alloytongqi, select the released dpa4-alloytongqi-l20 profile and its pinned image.",
         ],
     }
 

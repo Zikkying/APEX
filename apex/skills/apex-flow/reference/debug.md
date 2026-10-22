@@ -108,10 +108,10 @@ stack limit. See [Calculators](calculators.md) for complete inputs.
 | General DeePMD GPU | TF/PyTorch and Ni slab runtime checks; OpenAPI `apex-deepmd-runtime-20261016-relax-7hp89` |
 | Alloytongqi | `tongqi-openapi-acceptance-r5-relax-vwsb5`: 108-atom FeCoNi static make/run/post/retrieval/archive |
 
-Tongqi has `release_status: enabled`, `openapi_qualification.status: passed`
-and `qualification_status: pre_snapshot_only`. Full benchmark and legacy job
-E2E remain pending; static acceptance does not certify gamma convergence or
-all phonon/MD workflows. Keep these statuses and receipts intact.
+Tongqi is enabled for submission (`release_status: enabled`). Its published-image
+OpenAPI acceptance is recorded in `openapi_qualification`, including the tested
+composition, workflow and result hash. Use these receipts to describe the
+observed calculation; assess each requested material and property on its inputs.
 
 The published addresses are Bohrium registry images and may require project
 access. Docker Hub publication is not yet verified. Install the current MM ZIP,
