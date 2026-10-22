@@ -1,6 +1,6 @@
 ---
 name: apex-flow
-description: Run APEX 15-property materials workflows with LAMMPS, ABACUS or VASP: relaxation, elastic constants, EOS, defects, stacking faults, phonons, finite-temperature properties and RSS structures.
+description: "Run APEX 15-property materials workflows with LAMMPS, ABACUS or VASP: relaxation, elastic constants, EOS, defects, stacking faults, phonons, finite-temperature properties and RSS structures."
 ---
 
 # APEX Flow
