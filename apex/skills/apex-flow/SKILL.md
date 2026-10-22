@@ -20,7 +20,9 @@ atom count and the requested property.
 
 Use [Runtime images](reference/runtime-images.md) for exact paths.
 `models/DPA4-alloytongqi/model.pt` records source provenance; the tongqi
-profile supplies the executable image-resident model.
+profile supplies the executable image-resident model. For this selection, use
+`--backend lammps --potential deepmd --runtime-profile dpa4-alloytongqi-l20`;
+the profile sets the model path. See the [118-element list](models/DPA4-alloytongqi/README.md#elements).
 
 Generate with `scripts/generate_config.py create` using the approved inputs.
 Cloud/MM uses `BOHRIUM_ACCESS_KEY` and `BOHRIUM_PROJECT_ID` (or `--project-id`);

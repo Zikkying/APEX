@@ -131,7 +131,7 @@ Safe static inspection confirms a valid PyTorch ZIP checkpoint with
 commit string is embedded in the file. A type map does not by itself prove
 training-domain coverage.
 
-After publication, generate (do not hand-write) this image-resident contract:
+Generate this image-resident configuration with the tongqi profile:
 
 ```json
 {
@@ -148,20 +148,10 @@ After publication, generate (do not hand-write) this image-resident contract:
 }
 ```
 
-> Use `generate_config.py create --runtime-profile dpa4-alloytongqi-l20`.
-> Its profile must contain an immutable image identity and
-> `post_snapshot_passed` qualification. The target is one NVIDIA L20 (SM 8.9),
-> one MPI rank. Job SKU: `1 * NVIDIA L20_48g`; sandbox SKU:
-> `c16_m120_1 * NVIDIA L20`. T4 evidence does not qualify this target.
-> Generated commands use `/usr/local/bin/dpa4-lmp -in in.lammps` and
-> `/usr/local/bin/dpa4-phonolammps {input_file} -c {poscar} --dim {dim}
-> {primitive_axes}`. Other GPUs, multi-rank and CPU production are unqualified.
-> Use
-> `"type_map": "auto"` by default. APEX infers the local contiguous type
-> mapping from the structure; do not copy atomic-number or model-internal
-> indices. A `.pt` checkpoint is directly usable only when it is a compatible
-> single-task model supported by the selected runtime; do not generalize this
-> bundled model's handling to arbitrary multi-task training checkpoints.
+> Select `--backend lammps --potential deepmd --runtime-profile dpa4-alloytongqi-l20`.
+> The generator sets the image-resident model path, image and L20 commands.
+> Keep `"type_map": "auto"` for the structure's local atom-type mapping.
+> Model element types are listed in [Elements](../models/DPA4-alloytongqi/README.md#elements).
 
 ### Relaxation cal_setting (LAMMPS)
 

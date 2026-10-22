@@ -1863,9 +1863,7 @@ def main():
         "--runtime-profile",
         choices=[DPA4_RUNTIME_PROFILE],
         help=(
-            "Use an immutable image-resident runtime contract. The DPA4 "
-            "profile remains unavailable until its exact image digest passes "
-            "post-snapshot qualification."
+            "Select the released image-resident model, image and machine configuration."
         ),
     )
     create.add_argument("--properties", nargs="+", required=True,
