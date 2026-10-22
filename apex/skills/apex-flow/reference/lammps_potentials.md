@@ -1,10 +1,9 @@
 # APEX LAMMPS Potential Types — Detailed Reference
 
-Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+Current image roles and executable paths: [Runtime images](runtime-images.md).
 
 For tongqi, select `--runtime-profile dpa4-alloytongqi-l20`; add
-`--sandbox` for inner OpenAPI execution. Runtime diagnostics and acceptance
-receipts are in [Debug](debug.md).
+`--sandbox` for inner OpenAPI execution. Runtime diagnostics are in [Debug](debug.md).
 
 
 ## Overview

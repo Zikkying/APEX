@@ -1,10 +1,9 @@
 # APEX Submission Reference
 
-Current image roles, absolute commands and acceptance scope: [Runtime images](runtime-images.md).
+Current image roles and executable paths: [Runtime images](runtime-images.md).
 
 For tongqi, select `--runtime-profile dpa4-alloytongqi-l20`; add
-`--sandbox` for inner OpenAPI execution. Runtime diagnostics and acceptance
-receipts are in [Debug](debug.md).
+`--sandbox` for inner OpenAPI execution. Runtime diagnostics are in [Debug](debug.md).
 
 
 ## Execution Architecture (Two-Layer Model)
@@ -175,7 +174,7 @@ dflow validates workflow names against RFC 1123 subdomain regex. Names like `"Cu
 |------|-------|-------|
 | **Outer job / make-post** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | APEX 1.3.4 make/run/post dependencies preinstalled |
 | **LAMMPS calculator (GPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016` | NVIDIA L20; DeePMD TensorFlow/PyTorch only; includes phonoLAMMPS |
-| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | Classical LAMMPS; Al EAM runtime acceptance |
+| **LAMMPS calculator (CPU potentials)** | `registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline` | Classical LAMMPS |
 | **ABACUS calculator** | `registry.dp.tech/dptech/abacus:3.8.2` | Or user-specified |
 | **VASP calculator** | User must provide after confirming license | Commercial; **never invent a default image** |
 

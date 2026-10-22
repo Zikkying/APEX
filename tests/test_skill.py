@@ -35,7 +35,6 @@ class TestApexSkill(unittest.TestCase):
         debug = (root / "reference/debug.md").read_text()
         self.assertIn("reference/debug.md", text)
         self.assertIn("Unknown model type: dpa4", debug)
-        self.assertIn("DPA-3.2", debug)
         self.assertIn("15-property", text)
         self.assertIn("displacement_points", debug)
         self.assertIn("restart.coexistence.start", debug)
@@ -143,16 +142,7 @@ class TestApexSkill(unittest.TestCase):
             self.assertIn(
                 f"{SKILL_NAME}/scripts/dpa4_profile.py", names
             )
-            self.assertIn(
-                f"{SKILL_NAME}/benchmarks/dpa4-alloytongqi/"
-                "manifest.schema.json",
-                names,
-            )
-            self.assertIn(
-                f"{SKILL_NAME}/benchmarks/dpa4-alloytongqi/"
-                "verify_manifest.py",
-                names,
-            )
+            self.assertFalse(any("/benchmarks/" in n for n in names))
             with zipfile.ZipFile(out) as zf:
                 cloud_skill = zf.read(
                     f"{SKILL_NAME}/SKILL.md"

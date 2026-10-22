@@ -26,4 +26,4 @@ L20 machine and absolute executable paths. Add `--sandbox` for inner OpenAPI
 execution. Submit through `apex submit` to expand `type_map: "auto"`.
 
 See [Runtime images](../reference/runtime-images.md) for image selection and
-[Debug](../reference/debug.md) for compatibility diagnostics and acceptance.
+[Debug](../reference/debug.md) for compatibility diagnostics.

@@ -11,4 +11,4 @@
 
 Generate with `--runtime-profile dpa4-alloytongqi-l20` and use its image-resident
 `.pt2` contract. [Debug](../../reference/debug.md) covers runtime diagnostics
-and acceptance receipts.
+and environment troubleshooting.

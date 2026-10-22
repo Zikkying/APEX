@@ -49,5 +49,5 @@ Query the matching live machine catalog before allocating resources.
 
 ## Diagnostics
 
-See [Debug](debug.md) for runtime compatibility, acceptance receipts,
+See [Debug](debug.md) for runtime compatibility,
 registry access, saved configurations and troubleshooting.
