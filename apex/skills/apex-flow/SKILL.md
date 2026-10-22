@@ -41,8 +41,8 @@ outer Bohrium job. For a requested preview or `gamma_surface`, run
 the preview needs user review. The [preflight procedure](reference/submission.md#preflight-in-the-apexcpu-image)
 contains the staging and commands. Repeat checks when inputs change.
 
-Keep the submit client running for automatic result retrieval. Installed local
-editions follow `reference/execution-profile.md`.
+Keep the submit client running for automatic result retrieval.
+[Execution profile](reference/execution-profile.md) describes this edition.
 
 ## 3. Collect
 

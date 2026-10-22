@@ -143,6 +143,7 @@ class TestApexSkill(unittest.TestCase):
                 f"{SKILL_NAME}/scripts/dpa4_profile.py", names
             )
             self.assertFalse(any("/benchmarks/" in n for n in names))
+            self.assertIn(f"{SKILL_NAME}/reference/execution-profile.md", names)
             with zipfile.ZipFile(out) as zf:
                 cloud_skill = zf.read(
                     f"{SKILL_NAME}/SKILL.md"
@@ -153,6 +154,12 @@ class TestApexSkill(unittest.TestCase):
                     if not name.endswith(".pt")
                 )
             self.assertIn("outer Bohrium job", cloud_skill)
+            with zipfile.ZipFile(out) as zf:
+                execution_profile = zf.read(
+                    f"{SKILL_NAME}/reference/execution-profile.md"
+                ).decode("utf-8")
+            self.assertIn("MatMaster / Bohrium Cloud", execution_profile)
+            self.assertIn("outer submission job", execution_profile)
             self.assertIn("bohrium_config.ticket", cloud_skill)
             self.assertIn(
                 b"registry.dp.tech/dptech/dp/native/prod-397953/397637/"
