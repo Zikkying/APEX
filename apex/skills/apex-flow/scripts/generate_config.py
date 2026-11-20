@@ -1,0 +1,2510 @@
+#!/usr/bin/env python3
+"""
+APEX Configuration Generator
+
+Generates global.json and param.json for APEX workflows.
+Handles access_key → ticket conversion and RFC 1123 name compliance.
+
+Environment variables:
+    BOHRIUM_ACCESS_KEY  — Bohrium access key (converted to ticket via API)
+    BOHRIUM_PROJECT_ID  — Bohrium project ID (required unless --project-id is set)
+
+Usage:
+    python generate_config.py create \
+        --structure POSCAR \
+        --backend lammps \
+        --potential eam_alloy \
+        --model Cu01.eam.alloy \
+        --properties elastic \
+        --flow-type joint \
+        --workflow-name "cu-fcc-elastic" \
+        --output-dir ./job
+
+    # Multiple structures (repeat --structure and/or pass --structure-dir)
+    python generate_config.py create \
+        --structure pristine.vasp Ti_hcp.vasp V_bcc.vasp \
+        --structure-dir ./defects/ \
+        --backend lammps --potential deepmd --model model.pt \
+        --properties elastic --flow-type relax \
+        --output-dir ./job
+
+    python generate_config.py refresh-global --global ./job/global.json
+"""
+
+import argparse
+import copy
+import json
+import math
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+TICKET_API_URL = "https://openapi.dp.tech/openapi/v1/ticket/get"
+TICKET_EXPIRE_HOURS = 168  # 7 days; API 'expiration' parameter unit is HOURS
+DFLOW_HOST = "https://workflows.deepmodeling.com"
+SANDBOX_DFLOW_HOST = "https://lbg-workflow-dflow.dp.tech"
+SANDBOX_DISPATCHER_IMAGE = (
+    "registry.dp.tech/dptech/polycalibur:dpdispatcher-storehost-plan-a-20260811"
+)
+APEX_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
+LAMMPS_GPU_IMAGE = 'registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-deepmd-gpu:3.1.3-20261016'
+LAMMPS_CPU_IMAGE = "registry.dp.tech/dptech/dp/native/prod-397953/397637/apex-flow-cpu:1.3.4-20261016-offline"
+# Backward-compatible alias used by external callers and older tests. New code
+# must select LAMMPS_GPU_IMAGE or LAMMPS_CPU_IMAGE from the potential type.
+LAMMPS_IMAGE = LAMMPS_GPU_IMAGE
+ABACUS_IMAGE = "registry.dp.tech/dptech/abacus:3.8.2"
+DPA4_RUNTIME_PROFILE = "dpa4-alloytongqi-l20"
+# Recommended Bohrium VASP run command pieces (Intel oneAPI + absolute vasp_std).
+# Do NOT auto-set vasp_image_name — VASP is commercial; only set an image after
+# the user confirms they have a license and provides/approves the image.
+# Bare `mpirun -n N vasp_std` fails in typical Bohrium VASP images.
+VASP_BIN = "/opt/vasp.5.4.4/bin/vasp_std"
+
+# Default parameters for each property type
+# These are TESTED stable defaults that prevent KeyError failures.
+# All required parameters are included. Crystallographic constraints are satisfied.
+# Defaults are physically reasonable for typical FCC/BCC metals.
+PROPERTY_DEFAULTS = {
+    "eos": {
+        "type": "eos",
+        "vol_start": 0.8,
+        "vol_end": 1.2,
+        "vol_step": 0.05,
+    },
+    "cohesive": {
+        "type": "cohesive",
+        "latt_start": 0.8,
+        "latt_end": 1.5,
+        "latt_step": 0.05,
+        "cal_type": "static",
+    },
+    "elastic": {
+        "type": "elastic",
+        "norm_deform": 0.01,
+        "shear_deform": 0.01,
+    },
+    "surface": {
+        "type": "surface",
+        "min_slab_size": 50,
+        "min_vacuum_size": 20,
+        "max_miller": 2,
+    },
+    "vacancy": {
+        "type": "vacancy",
+        "supercell": [3, 3, 3],
+    },
+    "interstitial": {
+        "type": "interstitial",
+        "supercell": [3, 3, 3],
+    },
+    "phonon": {
+        "type": "phonon",
+        "supercell_size": [3, 3, 3],
+        "BAND_POINTS": 51,
+    },
+    "gamma": {
+        "type": "gamma",
+        "plane_miller": [1, 1, 1],
+        "slip_direction": [-1, 1, 0],
+        "supercell_size": [1, 1, 5],
+        "vacuum_size": 20,
+        "n_steps": 10,
+    },
+    "gamma_surface": {
+        "type": "gamma_surface",
+        "plane_miller": [1, 1, 1],
+        "slip_direction": [-1, 1, 0],
+        "supercell_size": [1, 1, 5],
+        "vacuum_size": 20,
+        "closed_loop": True,
+        "n_steps_x": 10,
+        "n_steps_y": 10,
+    },
+    "decohesive": {
+        "type": "decohesive",
+        "miller_index": [1, 1, 1],
+        "min_slab_size": 40,
+        "max_vacuum_size": 15,
+        "vacuum_size_step": 1.0,
+    },
+    "finite_t_latt": {
+        "type": "finite_t_latt",
+        "supercell_size": [3, 3, 3],
+        "cal_setting": {
+            "temperature": [200, 400, 600, 800],
+        },
+    },
+    "finite_t_elastic": {
+        "type": "finite_t_elastic",
+        "supercell_size": [3, 3, 3],
+        "cal_setting": {
+            "temperature": [300],
+            "strain": 0.001,
+        },
+    },
+    "melting_point": {
+        "type": "melting_point",
+        "method": "two_phase",
+        "supercell_size": [1, 1, 2],
+        "cal_setting": {
+            "temperature": [1500, 1600, 1700],
+            "premelt_temperature": 4500,
+            "premelt_steps": 5000,
+            "conditioning_steps": 5000,
+            "production_steps": 100000,
+            "restart_interval": 10000,
+            "timestep": 0.001,
+            "tdamp": 0.1,
+            "pdamp": 1.0,
+            "pressure": 0.0,
+            "barostat": "iso",
+            "interface_axis": "z",
+            "liquid_fraction": 0.5,
+            "replicas": 1,
+        },
+    },
+    "gruneisen": {
+        "type": "gruneisen",
+        "supercell_size": [2, 2, 2],
+        "MESH": [20, 20, 20],
+        "volume_strains": [-0.02, -0.01, 0.0, 0.01, 0.02],
+        "temperatures": [100, 200, 300, 400, 500],
+        "alpha_mode": "full",
+    },
+    "annealing": {
+        "type": "annealing",
+        "supercell_size": [3, 3, 3],
+        "cal_setting": {
+            "start_temp": 4,
+            "target_temp": 300,
+            "end_temp": 4,
+            "temp_ramp_rate": 1000,
+        },
+    },
+    "melting_point": {
+        "type": "melting_point",
+        "method": "two_phase",
+        "supercell_size": [1, 1, 2],
+        "cal_setting": {
+            "temperature": [1500, 1600, 1700],
+            "premelt_temperature": 4500,
+            "premelt_steps": 5000,
+            "conditioning_steps": 5000,
+            "production_steps": 100000,
+            "timestep": 0.001,
+            "tdamp": 0.1,
+            "pdamp": 1.0,
+            "pressure": 0.0,
+            "barostat": "iso",
+            "interface_axis": "z",
+            "liquid_fraction": 0.5,
+            "dump_step": 100,
+            "thermo_step": 100,
+            "restart_interval": 10000,
+            "q6_cutoff": 3.5,
+            "q6_neighbors": 12,
+            "replicas": 1,
+            "velocity_seeds": {
+                "premelt": 324159,
+                "condition": 271828,
+                "release": 161803,
+            },
+        },
+    },
+}
+
+# LAMMPS-only properties
+LAMMPS_ONLY = {"finite_t_elastic", "melting_point"}
+
+# GPU potential types — benefit from GPU scass_type
+GPU_POTENTIALS = {"deepmd", "mace", "nep"}
+
+
+def select_lammps_image(potential: str = None) -> str:
+    """Return the validated LAMMPS image for a potential's resource class."""
+    if potential in {"mace", "nep", "gap", "rann", "snap"}:
+        raise ValueError("MACE/NEP/GAP/RANN/SNAP require an explicitly validated custom image; default images do not qualify these pair styles")
+    if potential == "deepmd":
+        return LAMMPS_GPU_IMAGE
+    return LAMMPS_CPU_IMAGE
+
+
+def default_phonolammps_command(image):
+    executables = {
+        LAMMPS_CPU_IMAGE: "/opt/apex-venv/bin/phonolammps",
+        LAMMPS_GPU_IMAGE: "/opt/deepmd-kit-3.1.3/bin/phonolammps",
+    }
+    executable = executables.get(image)
+    if executable:
+        return executable + " {input_file} -c {poscar} --dim {dim} {primitive_axes}"
+    return None
+
+
+# scass_type defaults for inner dflow containers (legacy Bohrium)
+SCASS_TYPES = {
+    "lammps_gpu": "1 * NVIDIA L20_48g",
+    "lammps_cpu": "c16_m32_cpu",
+    "abacus": "c16_m32_cpu",
+    "vasp": "c32_m128_cpu",
+}
+
+# machine_type defaults for OpenAPI Sandbox
+SANDBOX_MACHINE_TYPES = {
+    "lammps_gpu": "c16_m120_1 * NVIDIA L20",
+    "lammps_cpu": "c8_m32_cpu",
+    "abacus": "c8_m32_cpu",
+    "vasp": "c32_m128_cpu",
+}
+
+
+# =============================================================================
+# Adaptive KSPACING based on system type and atom count
+# =============================================================================
+# Rules:
+#   - Bulk crystal: denser k-mesh for small unit cells, sparser for supercells
+#   - Surface/slab: moderate k-mesh (vacuum direction handled by APEX)
+#   - Amorphous/liquid: low k-point requirement (no long-range periodicity)
+# Always use KGAMMA = .TRUE.
+#
+# Users can override by providing explicit kspacing in --incar or cal_setting.
+
+def classify_system(structure) -> str:
+    """Classify a pymatgen Structure as 'bulk', 'surface', or 'amorphous'.
+
+    Heuristic:
+      - If any lattice vector > 15 Å and the cell is highly anisotropic
+        (max/min ratio > 2.5), treat as surface/slab.
+      - Otherwise treat as bulk crystal.
+      - 'amorphous' must be explicitly requested by the user (not auto-detected).
+    """
+    lengths = sorted(structure.lattice.abc)
+    ratio = lengths[-1] / max(lengths[0], 0.1)
+    if lengths[-1] > 15.0 and ratio > 2.5:
+        return "surface"
+    return "bulk"
+
+
+def adaptive_kspacing(structure, system_type: str = None) -> float:
+    """Determine KSPACING based on system type and atom count.
+
+    Args:
+        structure: pymatgen Structure object
+        system_type: 'bulk', 'surface', or 'amorphous' (auto-detected if None)
+
+    Returns:
+        Recommended KSPACING value (Å⁻¹ for VASP, 1/Bohr for ABACUS)
+
+    Rules (unified for all DFT properties):
+        bulk_crystal:
+          N <= 10:       0.16
+          10 < N <= 50:  0.20
+          50 < N <= 150: 0.25
+          N > 150:       0.30
+        surface_slab:
+          N <= 100:      0.22
+          N > 100:       0.28
+        amorphous_liquid:
+          N <= 100:      0.30
+          N > 100:       0.38
+    """
+    if system_type is None:
+        system_type = classify_system(structure)
+
+    n_atoms = len(structure)
+
+    if system_type == "amorphous":
+        return 0.30 if n_atoms <= 100 else 0.38
+    elif system_type == "surface":
+        return 0.22 if n_atoms <= 100 else 0.28
+    else:  # bulk (default)
+        if n_atoms <= 10:
+            return 0.16
+        elif n_atoms <= 50:
+            return 0.20
+        elif n_atoms <= 150:
+            return 0.25
+        else:
+            return 0.30
+
+
+def _nprocs_from_scass(scass_type: str, default: int = 16) -> int:
+    """Extract CPU count from scass strings like ``c32_m128_cpu`` → 32."""
+    if not scass_type:
+        return default
+    match = re.search(r"\bc(\d+)_", scass_type)
+    if match:
+        return int(match.group(1))
+    return default
+
+
+def default_vasp_run_command(nprocs: int = 32) -> str:
+    """Recommended Bohrium VASP run_command (user must still supply a licensed image)."""
+    return (
+        'bash -c "source /opt/intel/oneapi/setvars.sh && '
+        f'ulimit -s unlimited && mpirun -n {nprocs} {VASP_BIN}"'
+    )
+
+# =============================================================================
+# DFT Calculation Defaults (fast/loose for APEX validation workflows)
+# =============================================================================
+# Philosophy: APEX is for property screening, NOT publication-grade DFT.
+# Use fast settings to minimize wall time. Users can override for production.
+#
+# Key principle for ABACUS in APEX:
+#   - Do NOT set pseudo_dir/orbital_dir in INPUT (APEX manages paths via STRU)
+#   - STRU must have ATOMIC_SPECIES with PP filename and NUMERICAL_ORBITAL section
+#   - APEX's modify_stru_path() adds pp_orb/ prefix; INPUT pseudo_dir would double it
+
+ABACUS_INPUT_DEFAULTS = {
+    "relax": {
+        "calculation": "cell-relax",
+        "basis_type": "lcao",
+        "ecutwfc": 100,
+        "scf_thr": "1.0e-6",
+        "scf_nmax": 100,
+        "smearing_method": "gauss",
+        "smearing_sigma": 0.02,
+        "mixing_type": "broyden",
+        "mixing_beta": 0.7,
+        "cal_force": 1,
+        "cal_stress": 1,
+        "force_thr_ev": 0.02,
+        "stress_thr": 1.0,
+        "relax_nmax": 50,
+        "kspacing": None,       # Auto-filled by adaptive_kspacing(structure)
+    },
+    "phonon_scf": {
+        "calculation": "scf",
+        "basis_type": "lcao",
+        "ecutwfc": 100,
+        "scf_thr": "1.0e-7",
+        "scf_nmax": 100,
+        "smearing_method": "gauss",
+        "smearing_sigma": 0.01,
+        "mixing_type": "broyden",
+        "mixing_beta": 0.7,
+        "cal_force": 1,
+        "kspacing": None,       # Auto-filled by adaptive_kspacing(structure)
+    },
+}
+
+# Default VASP INCAR template (KSPACING auto-filled by adaptive_kspacing)
+VASP_INCAR_TEMPLATE = """\
+SYSTEM = APEX calculation
+PREC = Accurate
+ENCUT = 520
+EDIFF = 1E-6
+EDIFFG = -0.01
+IBRION = 2
+NSW = 200
+ISIF = 3
+ISMEAR = 1
+SIGMA = 0.1
+LREAL = Auto
+KSPACING = {kspacing}
+KGAMMA = .TRUE.
+"""
+
+# DFT-specific property defaults: smaller supercells, fewer points
+DFT_PROPERTY_OVERRIDES = {
+    "phonon": {
+        "supercell_size": [2, 2, 2],    # 8 atoms (vs 27 for 3x3x3)
+        "BAND_POINTS": 21,
+    },
+    "gruneisen": {
+        "supercell_size": [2, 2, 2],
+        "volume_strains": [-0.02, 0.0, 0.02],  # 3 points (vs 5), faster
+        "temperatures": [100, 300, 500],
+    },
+    "vacancy": {
+        "supercell": [2, 2, 2],         # 8 atoms (vs 27 for 3x3x3)
+    },
+    "interstitial": {
+        "supercell": [2, 2, 2],
+    },
+    "surface": {
+        "min_slab_size": 30,            # Thinner slab, fewer atoms
+        "min_vacuum_size": 15,
+        "max_miller": 1,                # Only low-index surfaces
+    },
+}
+
+
+# =============================================================================
+# Ticket conversion
+# =============================================================================
+
+def get_bohrium_ticket(access_key: str, expire_hours: int = TICKET_EXPIRE_HOURS) -> str:
+    """
+    Convert a Bohrium access_key to a dflow ticket via the OpenAPI.
+
+    API: GET https://openapi.dp.tech/openapi/v1/ticket/get?accessKey=<KEY>&expiration=<hours>
+    Header: x-app-key: (empty string)
+    Response: {"code": 0, "data": {"ticket": "UUID-36-chars"}}
+
+    Args:
+        access_key: Bohrium access key from environment.
+        expire_hours: Ticket validity in HOURS. Default 168 (7 days).
+            Must be called from sandbox where BOHRIUM_ACCESS_KEY is available.
+            The generated ticket is embedded in global.json for use by
+            containers that lack the access key.
+
+    Returns the ticket string (UUID).
+    Raises RuntimeError on failure.
+    """
+    url = f"{TICKET_API_URL}?accessKey={access_key}&expiration={expire_hours}"
+    req = Request(url, method="GET")
+    req.add_header("x-app-key", "")
+
+    try:
+        with urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode())
+    except (URLError, HTTPError) as e:
+        raise RuntimeError(f"Failed to get ticket from API: {e}") from e
+
+    if body.get("code") != 0:
+        raise RuntimeError(
+            f"Ticket API returned error: code={body.get('code')}, "
+            f"msg={body.get('message', body.get('msg', 'unknown'))}"
+        )
+
+    ticket = body.get("data", {}).get("ticket")
+    if not ticket or len(ticket) < 30:
+        raise RuntimeError(f"Invalid ticket received: {ticket!r}")
+
+    return ticket
+
+
+# =============================================================================
+# RFC 1123 workflow name
+# =============================================================================
+
+def sanitize_workflow_name(name: str) -> str:
+    """
+    Sanitize a workflow name to comply with RFC 1123 subdomain rules.
+
+    Rules:
+    - All lowercase
+    - Only [a-z0-9-] allowed
+    - Cannot start or end with '-'
+    - Max 63 characters
+
+    Examples:
+        "Cu-FCC-elastic" → "cu-fcc-elastic"
+        "Mo_BCC Surface" → "mo-bcc-surface"
+    """
+    # Lowercase
+    name = name.lower()
+    # Replace underscores, spaces, and other invalid chars with hyphens
+    name = re.sub(r"[^a-z0-9-]", "-", name)
+    # Collapse multiple hyphens
+    name = re.sub(r"-+", "-", name)
+    # Strip leading/trailing hyphens
+    name = name.strip("-")
+    # Truncate to 63 chars
+    name = name[:63].rstrip("-")
+
+    if not name:
+        name = "apex-workflow"
+
+    return name
+
+
+# =============================================================================
+# Global config generation
+# =============================================================================
+
+def resolve_project_id(project_id: int = None) -> int:
+    """
+    Resolve Bohrium project ID from --project-id or BOHRIUM_PROJECT_ID.
+
+    Never hardcode a personal/project-specific ID. Fail loudly if unset.
+    """
+    if project_id is not None:
+        return int(project_id)
+    env = os.environ.get("BOHRIUM_PROJECT_ID", "").strip()
+    if not env:
+        raise RuntimeError(
+            "BOHRIUM_PROJECT_ID environment variable not set and --project-id "
+            "not provided. Set BOHRIUM_PROJECT_ID to the active Bohrium project "
+            "before generating global.json."
+        )
+    try:
+        return int(env)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"BOHRIUM_PROJECT_ID must be an integer, got: {env!r}"
+        ) from exc
+
+
+def _load_dpa4_runtime_profile(runtime_profile):
+    """Resolve the one immutable DPA4 profile without duplicating its contract."""
+    if runtime_profile is None:
+        return None
+    if isinstance(runtime_profile, dict):
+        script_dir = Path(__file__).resolve().parent
+        if str(script_dir) not in sys.path:
+            sys.path.insert(0, str(script_dir))
+        from dpa4_profile import validate_dpa4_profile  # noqa: WPS433
+
+        return validate_dpa4_profile(
+            runtime_profile,
+            require_published=True,
+        )
+    if runtime_profile != DPA4_RUNTIME_PROFILE:
+        raise ValueError(f"Unknown runtime profile: {runtime_profile!r}")
+    script_dir = Path(__file__).resolve().parent
+    if str(script_dir) not in sys.path:
+        sys.path.insert(0, str(script_dir))
+    from dpa4_profile import load_dpa4_profile  # noqa: WPS433
+
+    return load_dpa4_profile(require_published=True)
+
+
+def _validate_image_scass(
+    image: str,
+    scass: str,
+    runtime_profile: str = None,
+) -> None:
+    """Reject known-bad image × scass_type combinations before write-out."""
+    script_dir = Path(__file__).resolve().parent
+    if str(script_dir) not in sys.path:
+        sys.path.insert(0, str(script_dir))
+    from validate_apex_combo import check_combo  # noqa: WPS433
+
+    ok, errors = check_combo(
+        image,
+        scass,
+        runtime_profile=runtime_profile,
+    )
+    if not ok:
+        raise RuntimeError(
+            "Blocked image × scass_type combination:\n  - "
+            + "\n  - ".join(errors)
+            + "\nRun: python scripts/validate_apex_combo.py list-combos"
+        )
+
+
+def build_global_json(backend: str, potential: str = None,
+                      access_key: str = None, project_id: int = None,
+                      scass_type: str = None,
+                      run_command: str = None,
+                      vasp_image: str = None,
+                      lammps_image: str = None,
+                      runtime_profile=None) -> dict:
+    """
+    Build global.json for APEX dflow submission.
+
+    This config tells APEX how to orchestrate calculations via
+    workflows.deepmodeling.com (dflow/Argo).
+
+    ``program_id`` / ``bohrium_config.project_id`` always come from
+    ``--project-id`` or ``BOHRIUM_PROJECT_ID`` (required).
+    """
+    dpa4_profile = _load_dpa4_runtime_profile(runtime_profile)
+    if dpa4_profile is not None:
+        if backend != "lammps" or potential != "deepmd":
+            raise ValueError(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} requires "
+                "--backend lammps --potential deepmd"
+            )
+        script_dir = Path(__file__).resolve().parent
+        if str(script_dir) not in sys.path:
+            sys.path.insert(0, str(script_dir))
+        from dpa4_profile import (  # noqa: WPS433
+            dpa4_image_name,
+            dpa4_recommended_combo,
+        )
+
+        dpa4_combo = dpa4_recommended_combo(dpa4_profile)
+        expected_scass = dpa4_combo["scass_type"]
+        expected_command = dpa4_profile["calculator"]["run_command"]
+        if scass_type is not None and scass_type != expected_scass:
+            raise ValueError(
+                f"DPA4 runtime profile requires scass_type={expected_scass!r}"
+            )
+        if run_command is not None and run_command != expected_command:
+            raise ValueError(
+                f"DPA4 runtime profile requires run_command={expected_command!r}"
+            )
+    pid = resolve_project_id(project_id)
+
+    # Resolve access key and convert to ticket
+    key = access_key or os.environ.get("BOHRIUM_ACCESS_KEY")
+    if not key:
+        raise RuntimeError(
+            "BOHRIUM_ACCESS_KEY environment variable not set and --access-key not provided. "
+            "Cannot generate ticket for dflow authentication."
+        )
+    ticket = get_bohrium_ticket(key)
+
+    # Determine scass_type for inner containers
+    if dpa4_profile is not None:
+        inner_scass = dpa4_combo["scass_type"]
+    elif scass_type:
+        inner_scass = scass_type
+    elif backend == "lammps" and potential in GPU_POTENTIALS:
+        inner_scass = SCASS_TYPES["lammps_gpu"]
+    elif backend == "lammps":
+        inner_scass = SCASS_TYPES["lammps_cpu"]
+    elif backend == "abacus":
+        inner_scass = SCASS_TYPES["abacus"]
+    elif backend == "vasp":
+        inner_scass = SCASS_TYPES["vasp"]
+    else:
+        inner_scass = SCASS_TYPES["lammps_cpu"]
+
+    # Determine run command for calculator
+    if dpa4_profile is not None:
+        calc_run_command = dpa4_profile["calculator"]["run_command"]
+    elif run_command:
+        calc_run_command = run_command
+    elif backend == "lammps":
+        calc_run_command = ("lmp -in in.lammps" if lammps_image else "/usr/local/bin/apex-lmp -in in.lammps" if potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
+    elif backend == "abacus":
+        calc_run_command = "mpirun -n 16 abacus"
+    elif backend == "vasp":
+        calc_run_command = default_vasp_run_command(
+            _nprocs_from_scass(inner_scass, default=32)
+        )
+    else:
+        calc_run_command = "lmp -in in.lammps"
+
+    # Determine calculator image
+    if dpa4_profile is not None:
+        selected_lammps_image = dpa4_image_name(dpa4_profile)
+    elif backend == "lammps":
+        selected_lammps_image = (
+            (lammps_image or "").strip()
+            or select_lammps_image(potential)
+        )
+    else:
+        selected_lammps_image = LAMMPS_CPU_IMAGE  # Fallback in global.json
+
+    _validate_image_scass(
+        selected_lammps_image,
+        inner_scass,
+        runtime_profile=(
+            DPA4_RUNTIME_PROFILE if dpa4_profile is not None else None
+        ),
+    )
+
+    config = {
+        "dflow_host": DFLOW_HOST,
+        "k8s_api_server": DFLOW_HOST,
+        "batch_type": "Bohrium",
+        "context_type": "Bohrium",
+        "job_type": "container",
+        "platform": "ali",
+        "program_id": pid,
+        "bohrium_config": {
+            "ticket": ticket,
+            "project_id": pid,
+        },
+        "apex_image_name": APEX_IMAGE,
+        "lammps_image_name": selected_lammps_image,
+        "lammps_run_command": calc_run_command,
+        "scass_type": inner_scass,
+        "group_size": 1,
+        "pool_size": 1,
+    }
+    if backend == "lammps" and dpa4_profile is None:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
+    if dpa4_profile is not None:
+        config["dispatcher_remote_command"] = "/usr/local/bin/dpa4-python"
+        config["phonolammps_run_command"] = dpa4_profile["calculator"][
+            "phonolammps_command"
+        ]
+
+    # Add backend-specific image fields
+    if backend == "abacus":
+        config["abacus_image_name"] = ABACUS_IMAGE
+        config["abacus_run_command"] = calc_run_command
+    elif backend == "vasp":
+        # Never invent a VASP image — commercial license required.
+        # Set only when caller passes an explicitly resolved/approved image
+        # (from Bohrium list_images or a user-known authorized address).
+        config["vasp_run_command"] = calc_run_command
+        if vasp_image:
+            config["vasp_image_name"] = vasp_image.strip()
+
+    return config
+
+
+def build_global_json_sandbox(backend: str, potential: str = None,
+                              access_key: str = None, project_id: int = None,
+                              machine_type: str = None,
+                              run_command: str = None,
+                              vasp_image: str = None,
+                              lammps_image: str = None, runtime_profile=None) -> dict:
+    """
+    Build global.json for APEX dflow submission via OpenAPI Sandbox.
+
+    Uses access_key directly (no ticket conversion needed).
+    Routes jobs through the Sandbox dflow host with the storeHost-patched
+    dispatcher sidecar image.
+    """
+    profile = _load_dpa4_runtime_profile(runtime_profile)
+    if profile:
+        if profile.get("openapi_qualification", {}).get("status") != "passed":
+            raise RuntimeError("DPA4 OpenAPI end-to-end qualification is pending")
+        if backend != "lammps" or potential not in (None, "deepmd"):
+            raise ValueError("DPA4 OpenAPI requires LAMMPS + DeePMD")
+        expected_machine = "c16_m120_1 * NVIDIA L20"
+        from dpa4_profile import dpa4_image_name
+        expected_image = dpa4_image_name(profile)
+        expected_command = profile["calculator"]["run_command"]
+        for value, expected in ((machine_type, expected_machine), (lammps_image, expected_image), (run_command, expected_command)):
+            if value is not None and value != expected:
+                raise ValueError("DPA4 OpenAPI machine, image and command must match the profile")
+        machine_type, lammps_image, run_command = expected_machine, expected_image, expected_command
+        potential = "deepmd"
+    pid = resolve_project_id(project_id)
+
+    # Resolve access key
+    key = access_key or os.environ.get("BOHRIUM_ACCESS_KEY")
+    if not key:
+        raise RuntimeError(
+            "BOHRIUM_ACCESS_KEY environment variable not set and --access-key "
+            "not provided. Required for OpenAPI Sandbox mode."
+        )
+
+    if backend == "vasp" and not (vasp_image or "").strip():
+        raise ValueError("OpenAPI VASP requires an explicitly authorized vasp_image")
+
+    # Determine machine_type for inner containers
+    if machine_type:
+        inner_machine = machine_type
+    elif backend == "lammps" and potential in GPU_POTENTIALS:
+        inner_machine = SANDBOX_MACHINE_TYPES["lammps_gpu"]
+    elif backend == "lammps":
+        inner_machine = SANDBOX_MACHINE_TYPES["lammps_cpu"]
+    elif backend == "abacus":
+        inner_machine = SANDBOX_MACHINE_TYPES["abacus"]
+    elif backend == "vasp":
+        inner_machine = SANDBOX_MACHINE_TYPES["vasp"]
+    else:
+        inner_machine = SANDBOX_MACHINE_TYPES["lammps_cpu"]
+
+    # Determine run command for calculator
+    if run_command:
+        calc_run_command = run_command
+    elif backend == "lammps":
+        calc_run_command = ("lmp -in in.lammps" if lammps_image else "/usr/local/bin/apex-lmp -in in.lammps" if potential == "deepmd" else "/usr/bin/lmp -in in.lammps")
+    elif backend == "abacus":
+        calc_run_command = "mpirun -n 8 abacus"
+    elif backend == "vasp":
+        calc_run_command = default_vasp_run_command(
+            _nprocs_from_scass(inner_machine, default=32)
+        )
+    else:
+        calc_run_command = "lmp -in in.lammps"
+
+    # Determine calculator image
+    selected_lammps_image = (
+        ((lammps_image or "").strip() or select_lammps_image(potential))
+        if backend == "lammps"
+        else LAMMPS_CPU_IMAGE
+    )
+    _validate_image_scass(selected_lammps_image, inner_machine)
+
+    config = {
+        "dflow_host": SANDBOX_DFLOW_HOST,
+        "k8s_api_server": SANDBOX_DFLOW_HOST,
+        "dflow_config": {
+            "host": SANDBOX_DFLOW_HOST,
+            "k8s_api_server": SANDBOX_DFLOW_HOST,
+            "namespace": "dflow",
+            "token": "",
+        },
+        "batch_type": "OpenAPI",
+        "context_type": "OpenAPI",
+        "access_key": key,
+        "project_id": pid,
+        "app_key": os.environ.get("BOHRIUM_APP_KEY", "agent"),
+        "platform": "ali",
+        "machine_type": inner_machine,
+        "image_address": selected_lammps_image if backend == "lammps" else ABACUS_IMAGE if backend == "abacus" else vasp_image.strip(),
+        "output_log": False,
+        "dispatcher_image": SANDBOX_DISPATCHER_IMAGE,
+        "bohrium_config": {
+            "access_key": key,
+            "project_id": pid,
+            "app_key": os.environ.get("BOHRIUM_APP_KEY", "agent"),
+        },
+        "apex_image_name": APEX_IMAGE,
+        "lammps_image_name": selected_lammps_image,
+        "lammps_run_command": calc_run_command,
+        "group_size": 1,
+        "pool_size": 1,
+    }
+
+    # Add backend-specific image fields
+    if backend == "abacus":
+        config["abacus_image_name"] = ABACUS_IMAGE
+        config["abacus_run_command"] = calc_run_command
+    elif backend == "vasp":
+        config["vasp_run_command"] = calc_run_command
+        if vasp_image:
+            config["vasp_image_name"] = vasp_image.strip()
+
+    if backend == "lammps" and not profile and not lammps_image:
+        config["dispatcher_remote_command"] = ("/usr/local/bin/apex-calculator-python" if potential in GPU_POTENTIALS else "/opt/apex-venv/bin/python")
+        config["ignore_exit_code"] = False
+
+    if backend == "lammps" and not profile:
+        command = default_phonolammps_command(selected_lammps_image)
+        if command:
+            config["phonolammps_run_command"] = command
+    if profile:
+        config["phonolammps_run_command"] = profile["calculator"]["phonolammps_command"]
+        config["ignore_exit_code"] = False
+        config["dispatcher_remote_command"] = "/usr/local/bin/dpa4-python"
+    return config
+
+
+def validate_project_id_types(config: dict) -> int:
+    """Hard-check every supported Bohrium project ID before submission."""
+    # OpenAPI Sandbox mode uses project_id directly (no program_id)
+    context_type = config.get("context_type", "")
+    if context_type.lower() == "openapi":
+        project_id = config.get("project_id")
+        if type(project_id) is not int or project_id <= 0:
+            raise ValueError(
+                "global.json project_id must be a positive, unquoted JSON integer "
+                "(OpenAPI Sandbox mode)"
+            )
+        bohrium_config = config.get("bohrium_config")
+        if isinstance(bohrium_config, dict):
+            bc_pid = bohrium_config.get("project_id")
+            if type(bc_pid) is not int or bc_pid <= 0:
+                raise ValueError(
+                    "global.json bohrium_config.project_id must be a positive, "
+                    "unquoted JSON integer"
+                )
+            if bc_pid != project_id:
+                raise ValueError(
+                    "global.json project_id and bohrium_config.project_id must match"
+                )
+        return project_id
+
+    # Legacy Bohrium mode uses program_id
+    program_id = config.get("program_id")
+    if type(program_id) is not int or program_id <= 0:
+        raise ValueError(
+            "global.json program_id must be a positive, unquoted JSON integer"
+        )
+
+    bohrium_config = config.get("bohrium_config")
+    if not isinstance(bohrium_config, dict):
+        raise ValueError("global.json must contain a bohrium_config object")
+    project_id = bohrium_config.get("project_id")
+    if type(project_id) is not int or project_id <= 0:
+        raise ValueError(
+            "global.json bohrium_config.project_id must be a positive, "
+            "unquoted JSON integer"
+        )
+    if project_id != program_id:
+        raise ValueError(
+            "global.json program_id and bohrium_config.project_id must match"
+        )
+
+    machine = config.get("machine")
+    if isinstance(machine, dict):
+        remote_profile = machine.get("remote_profile")
+        if isinstance(remote_profile, dict) and "program_id" in remote_profile:
+            nested_id = remote_profile["program_id"]
+            if type(nested_id) is not int or nested_id <= 0:
+                raise ValueError(
+                    "global.json machine.remote_profile.program_id must be a "
+                    "positive, unquoted JSON integer"
+                )
+            if nested_id != program_id:
+                raise ValueError(
+                    "global.json machine.remote_profile.program_id must match "
+                    "program_id"
+                )
+    return program_id
+
+
+def refresh_global_json(global_path, access_key: str = None,
+                        project_id: int = None) -> dict:
+    """Refresh the selected backend credentials without touching param.json."""
+    path = Path(global_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"global.json not found: {path}")
+
+    with open(path, encoding="utf-8") as f:
+        config = json.load(f)
+    if not isinstance(config, dict):
+        raise ValueError("global.json must contain a JSON object")
+
+    pid = resolve_project_id(project_id)
+    key = access_key or os.environ.get("BOHRIUM_ACCESS_KEY")
+    if not key:
+        raise RuntimeError(
+            "BOHRIUM_ACCESS_KEY environment variable not set and --access-key "
+            "not provided. Cannot refresh dflow authentication."
+        )
+    bohrium_config = config.setdefault("bohrium_config", {})
+    if not isinstance(bohrium_config, dict):
+        raise ValueError("global.json bohrium_config must be a JSON object")
+    machine = config.get("machine") or {}
+    remote_profile = machine.get("remote_profile") if isinstance(machine, dict) else None
+    if str(config.get("context_type", "")).lower() == "openapi":
+        config["access_key"] = key
+        config["project_id"] = pid
+        bohrium_config["access_key"] = key
+        bohrium_config["project_id"] = pid
+        if isinstance(remote_profile, dict):
+            remote_profile.update(access_key=key, project_id=pid)
+    else:
+        ticket = get_bohrium_ticket(key)
+        config["program_id"] = pid
+        bohrium_config["project_id"] = pid
+        bohrium_config["ticket"] = ticket
+        if isinstance(remote_profile, dict) and "program_id" in remote_profile:
+            remote_profile["program_id"] = pid
+
+    validate_project_id_types(config)
+
+    temp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+            f.write("\n")
+        os.chmod(temp_path, path.stat().st_mode)
+        os.replace(temp_path, path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+    return config
+
+
+# =============================================================================
+# Interaction and param.json
+# =============================================================================
+
+def build_interaction(backend: str, potential: str = None,
+                      model: str = None,
+                      incar: str = None, potcar_prefix: str = None,
+                      potcars: dict = None, orb_files: dict = None,
+                      runtime_profile=None) -> dict:
+    """Build interaction configuration."""
+    dpa4_profile = _load_dpa4_runtime_profile(runtime_profile)
+    if dpa4_profile is not None:
+        if backend != "lammps" or potential != "deepmd":
+            raise ValueError(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} requires "
+                "--backend lammps --potential deepmd"
+            )
+        if model:
+            raise ValueError(
+                "DPA4 runtime profile uses an image-resident PT2 artifact; "
+                "do not pass --model or stage model.pt as the LAMMPS runtime"
+            )
+        script_dir = Path(__file__).resolve().parent
+        if str(script_dir) not in sys.path:
+            sys.path.insert(0, str(script_dir))
+        from dpa4_profile import dpa4_interaction  # noqa: WPS433
+
+        return dpa4_interaction(dpa4_profile)
+    if backend == "lammps":
+        if not potential:
+            raise ValueError("--potential required for LAMMPS backend")
+        if not model:
+            raise ValueError("--model required for LAMMPS backend")
+        return {
+            "type": potential,
+            "model": model,
+            "type_map": "auto",
+        }
+    elif backend == "abacus":
+        interaction = {
+            "type": "abacus",
+            "incar": incar or "INPUT",
+            "potcar_prefix": potcar_prefix or ".",
+        }
+        if potcars:
+            interaction["potcars"] = potcars
+        if orb_files:
+            interaction["orb_files"] = orb_files
+        return interaction
+    elif backend == "vasp":
+        interaction = {
+            "type": "vasp",
+            "incar": incar or "INCAR",
+            "potcar_prefix": potcar_prefix or ".",
+        }
+        if potcars:
+            interaction["potcars"] = potcars
+        return interaction
+    else:
+        raise ValueError(f"Unknown backend: {backend}")
+
+
+def stage_lammps_model(model: str, output_dir: Path) -> str:
+    """Copy a LAMMPS model into the job root and return its relative name."""
+    if not model:
+        raise ValueError("--model required for LAMMPS backend")
+    source = Path(model).expanduser()
+    if not source.is_file():
+        raise FileNotFoundError(f"LAMMPS model not found: {source}")
+    destination = Path(output_dir) / source.name
+    shutil.copy2(source, destination)
+    print(f"Copied model to {destination}")
+    return destination.name
+
+
+def resolve_source_potcar_file(prefix: Path, entry: str) -> Path:
+    """Locate a readable POTCAR under prefix for a potcars entry."""
+    direct = (prefix / entry).expanduser()
+    if direct.is_file():
+        return direct.resolve()
+    nested = (prefix / entry / "POTCAR").expanduser()
+    if nested.is_file():
+        return nested.resolve()
+    raise FileNotFoundError(
+        f"POTCAR not found for entry '{entry}' under '{prefix}' "
+        f"(tried '{direct}' and '{nested}')"
+    )
+
+
+
+# =============================================================================
+# ABACUS pseudopotential and orbital file download/staging
+# =============================================================================
+
+# SG15 ONCV pseudopotential + DZP orbital download URLs (Gitee mirror)
+ABACUS_PP_ORB_BASE = "https://gitee.com/deepmodeling/abacus-develop/raw/develop/tests/PP_ORB"
+
+# Known pp/orb filenames per element (SG15 ONCV PBE + numerical orbital)
+# Only commonly used elements listed; extend as needed.
+ABACUS_PP_MAP = {
+    "H": "H_ONCV_PBE-1.0.upf",
+    "Li": "Li_ONCV_PBE-1.0.upf",
+    "Be": "Be_ONCV_PBE-1.0.upf",
+    "B": "B_ONCV_PBE-1.0.upf",
+    "C": "C_ONCV_PBE-1.0.upf",
+    "N": "N_ONCV_PBE-1.0.upf",
+    "O": "O_ONCV_PBE-1.0.upf",
+    "F": "F_ONCV_PBE-1.0.upf",
+    "Na": "Na_ONCV_PBE-1.0.upf",
+    "Mg": "Mg_ONCV_PBE-1.0.upf",
+    "Al": "Al_ONCV_PBE-1.0.upf",
+    "Si": "Si_ONCV_PBE-1.0.upf",
+    "P": "P_ONCV_PBE-1.0.upf",
+    "S": "S_ONCV_PBE-1.0.upf",
+    "Cl": "Cl_ONCV_PBE-1.0.upf",
+    "K": "K_ONCV_PBE-1.0.upf",
+    "Ca": "Ca_ONCV_PBE-1.0.upf",
+    "Ti": "Ti_ONCV_PBE-1.0.upf",
+    "V": "V_ONCV_PBE-1.0.upf",
+    "Cr": "Cr_ONCV_PBE-1.0.upf",
+    "Mn": "Mn_ONCV_PBE-1.0.upf",
+    "Fe": "Fe_ONCV_PBE-1.0.upf",
+    "Co": "Co_ONCV_PBE-1.0.upf",
+    "Ni": "Ni_ONCV_PBE-1.0.upf",
+    "Cu": "Cu_ONCV_PBE-1.0.upf",
+    "Zn": "Zn_ONCV_PBE-1.0.upf",
+    "Ga": "Ga_ONCV_PBE-1.0.upf",
+    "Ge": "Ge_ONCV_PBE-1.0.upf",
+    "As": "As_ONCV_PBE-1.0.upf",
+    "Se": "Se_ONCV_PBE-1.0.upf",
+    "Br": "Br_ONCV_PBE-1.0.upf",
+    "Sr": "Sr_ONCV_PBE-1.0.upf",
+    "Y": "Y_ONCV_PBE-1.0.upf",
+    "Zr": "Zr_ONCV_PBE-1.0.upf",
+    "Nb": "Nb_ONCV_PBE-1.0.upf",
+    "Mo": "Mo_ONCV_PBE-1.0.upf",
+    "Ag": "Ag_ONCV_PBE-1.0.upf",
+    "Sn": "Sn_ONCV_PBE-1.0.upf",
+    "Ba": "Ba_ONCV_PBE-1.0.upf",
+    "W": "W_ONCV_PBE-1.0.upf",
+    "Pt": "Pt_ONCV_PBE-1.0.upf",
+    "Au": "Au_ONCV_PBE-1.0.upf",
+    "Pb": "Pb_ONCV_PBE-1.0.upf",
+}
+
+ABACUS_ORB_MAP = {
+    "H": "H_gga_6au_100Ry_2s1p.orb",
+    "Li": "Li_gga_7au_100Ry_4s1p.orb",
+    "C": "C_gga_7au_100Ry_2s2p1d.orb",
+    "N": "N_gga_7au_100Ry_2s2p1d.orb",
+    "O": "O_gga_7au_100Ry_2s2p1d.orb",
+    "Al": "Al_gga_7au_100Ry_4s4p1d.orb",
+    "Si": "Si_gga_7au_100Ry_2s2p1d.orb",
+    "Ti": "Ti_gga_8au_100Ry_4s2p2d1f.orb",
+    "V": "V_gga_8au_100Ry_4s2p2d1f.orb",
+    "Cr": "Cr_gga_8au_100Ry_4s2p2d1f.orb",
+    "Mn": "Mn_gga_8au_100Ry_4s2p2d1f.orb",
+    "Fe": "Fe_gga_8au_100Ry_4s2p2d1f.orb",
+    "Co": "Co_gga_8au_100Ry_4s2p2d1f.orb",
+    "Ni": "Ni_gga_8au_100Ry_4s2p2d1f.orb",
+    "Cu": "Cu_gga_9au_100Ry_4s2p2d1f.orb",
+    "Zn": "Zn_gga_8au_100Ry_4s2p2d1f.orb",
+    "Ga": "Ga_gga_8au_100Ry_4s2p2d1f.orb",
+    "Ge": "Ge_gga_8au_100Ry_2s2p2d1f.orb",
+    "Mo": "Mo_gga_9au_100Ry_4s2p2d1f.orb",
+    "Ag": "Ag_gga_9au_100Ry_4s2p2d1f.orb",
+    "W": "W_gga_8au_100Ry_4s2p2d1f.orb",
+    "Au": "Au_gga_9au_100Ry_4s2p2d1f.orb",
+}
+
+
+def download_abacus_pp_orb(elements: list, output_dir: Path) -> tuple:
+    """Download ABACUS pseudopotential and orbital files for given elements.
+
+    Downloads from Gitee mirror of ABACUS test PP_ORB directory.
+    Returns (potcars_dict, orb_files_dict) with filenames relative to pp_orb/.
+    """
+    pp_orb_dir = output_dir / "pp_orb"
+    pp_orb_dir.mkdir(parents=True, exist_ok=True)
+
+    potcars = {}
+    orb_files = {}
+    missing_pp = []
+    missing_orb = []
+
+    for elem in elements:
+        # Download pseudopotential
+        pp_name = ABACUS_PP_MAP.get(elem)
+        if not pp_name:
+            missing_pp.append(elem)
+            continue
+        pp_path = pp_orb_dir / pp_name
+        if not pp_path.exists():
+            url = f"{ABACUS_PP_ORB_BASE}/{pp_name}"
+            print(f"  Downloading PP for {elem}: {pp_name} ...", end=" ")
+            try:
+                req = Request(url, headers={"User-Agent": "APEX-generate-config"})
+                with urlopen(req, timeout=30) as resp:
+                    pp_path.write_bytes(resp.read())
+                print("OK")
+            except (URLError, HTTPError, OSError) as exc:
+                print(f"FAILED ({exc})")
+                missing_pp.append(elem)
+                continue
+        potcars[elem] = pp_name
+
+        # Download orbital file
+        orb_name = ABACUS_ORB_MAP.get(elem)
+        if not orb_name:
+            missing_orb.append(elem)
+            continue
+        orb_path = pp_orb_dir / orb_name
+        if not orb_path.exists():
+            url = f"{ABACUS_PP_ORB_BASE}/{orb_name}"
+            print(f"  Downloading ORB for {elem}: {orb_name} ...", end=" ")
+            try:
+                req = Request(url, headers={"User-Agent": "APEX-generate-config"})
+                with urlopen(req, timeout=30) as resp:
+                    orb_path.write_bytes(resp.read())
+                print("OK")
+            except (URLError, HTTPError, OSError) as exc:
+                print(f"FAILED ({exc})")
+                missing_orb.append(elem)
+                continue
+        orb_files[elem] = orb_name
+
+    if missing_pp:
+        print(f"  WARNING: No PP mapping for elements: {missing_pp}")
+        print("  Provide --potcars manually for these elements.")
+    if missing_orb:
+        print(f"  WARNING: No ORB mapping for elements: {missing_orb}")
+        print("  Provide --orb-files manually or use PW basis.")
+
+    return potcars, orb_files
+
+
+def stage_vasp_potcars(
+    output_dir: Path, source_prefix: str, potcars: dict
+) -> tuple:
+    """Copy required POTCAR files into the job root and return upload-safe paths.
+
+    Bohrium/dflow containers do not see host absolute libraries such as
+    ``/share/PAW_PBE``. Stage flat files into the job directory and set
+    ``potcar_prefix`` to ``"."`` so ``pack_upload_dir`` uploads them as
+    ordinary job-root files (nested dirs under ``"."`` are not included).
+    """
+    if not source_prefix:
+        raise ValueError(
+            "VASP requires --potcar-prefix pointing to a readable POTCAR library"
+        )
+    if not potcars:
+        raise ValueError(
+            "VASP requires --potcars mapping, e.g. "
+            "'Ti:Ti_pv/POTCAR,V:V_sv/POTCAR'"
+        )
+
+    src_root = Path(source_prefix).expanduser()
+    if not src_root.exists():
+        raise FileNotFoundError(f"potcar_prefix not accessible: {src_root}")
+    if not os.access(src_root, os.R_OK):
+        raise PermissionError(f"potcar_prefix not readable: {src_root}")
+
+    staged = {}
+    for element, entry in potcars.items():
+        src_file = resolve_source_potcar_file(src_root, entry)
+        # Flat job-root name so Bohrium upload packs the file (not a subdir).
+        flat_name = f"POTCAR_{element}"
+        dest_file = output_dir / flat_name
+        shutil.copy2(src_file, dest_file)
+        staged[element] = flat_name
+        print(f"Staged POTCAR {element}: {src_file} → {dest_file}")
+
+    return ".", staged
+
+
+STRUCTURE_FILENAMES = {"POSCAR", "CONTCAR", "STRU"}
+STRUCTURE_SUFFIXES = {".vasp", ".cif", ".xyz"}
+
+
+def sanitize_conf_name(name: str) -> str:
+    """Make a filesystem-safe confs/ directory name."""
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "_", name.strip())
+    cleaned = cleaned.strip("._-")
+    return cleaned or "input"
+
+
+def unique_conf_name(stem: str, used: set) -> str:
+    """Return a unique conf name, appending _2, _3, ... on collision."""
+    base = sanitize_conf_name(stem)
+    name = base
+    idx = 2
+    while name in used:
+        name = f"{base}_{idx}"
+        idx += 1
+    used.add(name)
+    return name
+
+
+def collect_structures_from_dir(dir_path: Path) -> list:
+    """Collect structure files from a directory.
+
+    Includes:
+    - direct files named POSCAR/CONTCAR/STRU or with .vasp/.cif/.xyz
+    - immediate child directories that contain POSCAR/CONTCAR/STRU
+    """
+    root = Path(dir_path)
+    if not root.is_dir():
+        raise ValueError(f"--structure-dir is not a directory: {dir_path}")
+
+    found = []
+    for entry in sorted(root.iterdir(), key=lambda p: p.name):
+        if entry.is_file():
+            if entry.name in STRUCTURE_FILENAMES or entry.suffix.lower() in STRUCTURE_SUFFIXES:
+                found.append(entry.resolve())
+        elif entry.is_dir():
+            for candidate in ("POSCAR", "CONTCAR", "STRU"):
+                nested = entry / candidate
+                if nested.is_file():
+                    found.append(nested.resolve())
+                    break
+    return found
+
+
+def resolve_structure_sources(structure_args, structure_dir_args) -> list:
+    """Resolve --structure / --structure-dir into an ordered list of source files."""
+    sources = []
+    seen = set()
+
+    for path_str in structure_args or []:
+        path = Path(path_str)
+        if not path.is_file():
+            raise ValueError(f"--structure file not found: {path_str}")
+        resolved = path.resolve()
+        if resolved not in seen:
+            sources.append(resolved)
+            seen.add(resolved)
+
+    for dir_str in structure_dir_args or []:
+        for path in collect_structures_from_dir(Path(dir_str)):
+            if path not in seen:
+                sources.append(path)
+                seen.add(path)
+
+    if not sources:
+        raise ValueError(
+            "No structure files found. Pass --structure FILE [FILE ...] "
+            "and/or --structure-dir DIR [DIR ...]."
+        )
+    return sources
+
+
+def plan_structure_layout(sources: list) -> list:
+    """Map source files to job-relative conf dirs and param.json patterns.
+
+    Single structure → confs/input (backward compatible).
+    Multiple → confs/<stem>/POSCAR with an explicit structures list.
+    """
+    if len(sources) == 1:
+        return [{
+            "source": sources[0],
+            "conf_name": "input",
+            "rel_dir": "confs/input",
+            "dest_name": "POSCAR",
+        }]
+
+    used = set()
+    layout = []
+    for source in sources:
+        stem = source.stem
+        if source.name in STRUCTURE_FILENAMES:
+            # Prefer parent directory name when the file itself is POSCAR/etc.
+            parent = source.parent.name
+            stem = parent if parent not in (".", "") else "input"
+        conf_name = unique_conf_name(stem, used)
+        layout.append({
+            "source": source,
+            "conf_name": conf_name,
+            "rel_dir": f"confs/{conf_name}",
+            "dest_name": "POSCAR",
+        })
+    return layout
+
+
+LAMMPS_ACCURACY = {"screening": 1e-4, "balanced": 1e-5, "precise": 1e-6}
+
+
+def resolve_lammps_ftol(accuracy="precise", ftol=None):
+    import math
+    value = LAMMPS_ACCURACY[accuracy] if ftol is None else float(ftol)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("ftol must be finite and positive")
+    if value < 1e-6 or value > 1e-4:
+        print("Warning: ftol outside recommended 1e-6..1e-4; preserve the explicit "
+              "choice and verify convergence using LAMMPS logs.", file=sys.stderr)
+    return value
+
+
+def apply_lammps_accuracy(param, ftol):
+    """Fill missing tolerances; preserve explicitly approved per-task settings."""
+    if param["interaction"]["type"] in ("vasp", "abacus"):
+        return param
+    for task in ([param["relaxation"]] if "relaxation" in param else []) + param.get("properties", []):
+        task.setdefault("cal_setting", {}).setdefault("ftol", ftol)
+    return param
+
+
+def build_param_json(structure_paths, interaction: dict,
+                     properties: list, flow_type: str = "joint",
+                     relaxation_settings: dict = None,
+                     gamma_overrides: dict = None,
+                     property_configs: list = None,
+                     melting_overrides: dict = None,
+                     lammps_ftol: float = 1e-6) -> dict:
+    """Build param.json configuration.
+
+    structure_paths: one path string or a list of path strings for `structures`.
+    """
+    if isinstance(structure_paths, str):
+        structures = [structure_paths]
+    else:
+        structures = list(structure_paths)
+    param = {
+        "structures": structures,
+        "interaction": interaction,
+    }
+
+    # Relaxation settings
+    if flow_type in ("joint", "relax"):
+        if relaxation_settings:
+            param["relaxation"] = {"cal_setting": relaxation_settings}
+        else:
+            # Default relaxation settings based on backend
+            if interaction["type"] in ("vasp", "abacus"):
+                param["relaxation"] = {
+                    "cal_setting": {
+                        "relax_pos": True,
+                        "relax_shape": True,
+                        "relax_vol": True,
+                    }
+                }
+            else:
+                param["relaxation"] = {
+                    "cal_setting": {
+                        "etol": 0,
+                        "ftol": lammps_ftol,
+                        "maxiter": 5000,
+                        "maximal": 500000,
+                    }
+                }
+
+    # Properties
+    if flow_type in ("joint", "props"):
+        if property_configs is not None:
+            param["properties"] = copy.deepcopy(property_configs)
+            return apply_lammps_accuracy(param, lammps_ftol)
+        prop_configs = []
+        is_dft = interaction.get("type") in ("abacus", "vasp")
+        for prop_name in properties:
+            if prop_name in PROPERTY_DEFAULTS:
+                prop_config = copy.deepcopy(PROPERTY_DEFAULTS[prop_name])
+                # Apply DFT-specific overrides (smaller supercells, fewer points)
+                if is_dft and prop_name in DFT_PROPERTY_OVERRIDES:
+                    prop_config.update(DFT_PROPERTY_OVERRIDES[prop_name])
+                if prop_name in {"gamma", "gamma_surface"}:
+                    prop_config.update(
+                        gamma_overrides_for_property(
+                            prop_name, gamma_overrides or {}
+                        )
+                    )
+                if prop_name == "melting_point" and melting_overrides:
+                    cal_setting = prop_config.setdefault("cal_setting", {})
+                    cal_setting.update(copy.deepcopy(melting_overrides))
+                prop_configs.append(prop_config)
+            else:
+                raise ValueError(f"Unknown property: {prop_name}")
+        param["properties"] = prop_configs
+
+    return apply_lammps_accuracy(param, lammps_ftol)
+
+
+def load_confirmed_property_configs(path: str, requested: list) -> list:
+    """Load an approved property list and select entries in requested order."""
+    source = Path(path).expanduser()
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    configs = payload.get("properties") if isinstance(payload, dict) else payload
+    if not isinstance(configs, list) or not all(
+        isinstance(item, dict) and isinstance(item.get("type"), str)
+        for item in configs
+    ):
+        raise ValueError(
+            "--property-config must be a JSON list of property objects or "
+            "an object containing a 'properties' list"
+        )
+    by_type = {}
+    for item in configs:
+        prop_type = item["type"]
+        if prop_type in by_type:
+            raise ValueError(
+                f"--property-config contains duplicate type: {prop_type}"
+            )
+        by_type[prop_type] = item
+    missing = [prop_type for prop_type in requested if prop_type not in by_type]
+    if missing:
+        raise ValueError(
+            "--property-config is missing requested properties: "
+            + ", ".join(missing)
+        )
+    return [copy.deepcopy(by_type[prop_type]) for prop_type in requested]
+
+
+def _normalized_numeric_sequence(values):
+    """Keep integer-looking CLI values as ints while allowing transformed vectors."""
+    normalized = []
+    for value in values:
+        number = float(value)
+        normalized.append(int(number) if number.is_integer() else number)
+    return normalized
+
+
+def gamma_overrides_from_args(args) -> dict:
+    """Collect only explicitly supplied ``--gamma-*`` options."""
+    option_map = {
+        "parent_lattice": "gamma_parent_lattice",
+        "plane_miller": "gamma_plane_miller",
+        "slip_direction": "gamma_slip_direction",
+        "supercell_size": "gamma_supercell_size",
+        "vacuum_size": "gamma_vacuum_size",
+        "require_orthogonal_cell": "gamma_require_orthogonal_cell",
+        "min_slab_height": "gamma_min_slab_height",
+        "max_atoms": "gamma_max_atoms",
+        "min_distance": "gamma_min_distance",
+        "displacement_points": "gamma_displacement_points",
+        "n_steps": "gamma_n_steps",
+        "n_steps_x": "gamma_n_steps_x",
+        "n_steps_y": "gamma_n_steps_y",
+        "closed_loop": "gamma_closed_loop",
+    }
+    overrides = {}
+    for key, attr in option_map.items():
+        value = getattr(args, attr, None)
+        if value is None:
+            continue
+        if key in {"plane_miller", "slip_direction", "supercell_size"}:
+            value = _normalized_numeric_sequence(value)
+        elif key == "displacement_points":
+            value = sorted(float(item) for item in value)
+        overrides[key] = value
+    return overrides
+
+
+def gamma_overrides_for_property(prop_name: str, overrides: dict) -> dict:
+    """Return the subset of Gamma CLI overrides valid for one property type."""
+    common = {
+        "parent_lattice",
+        "plane_miller",
+        "slip_direction",
+        "supercell_size",
+        "vacuum_size",
+        "min_slab_height",
+        "max_atoms",
+        "min_distance",
+        "require_orthogonal_cell",
+    }
+    allowed = common | (
+        {"n_steps", "displacement_points"} if prop_name == "gamma"
+        else {"n_steps_x", "n_steps_y", "closed_loop"}
+    )
+    return {key: copy.deepcopy(value) for key, value in overrides.items()
+            if key in allowed}
+
+
+def validate_gamma_cli_options(properties: list, overrides: dict) -> list:
+    """Reject ambiguous or misplaced Gamma-only command-line options."""
+    if not overrides:
+        return []
+    errors = []
+    requested = set(properties)
+    gamma_types = requested & {"gamma", "gamma_surface"}
+    if not gamma_types:
+        return [
+            "--gamma-* options require --properties gamma and/or gamma_surface"
+        ]
+    if "n_steps" in overrides and "gamma" not in gamma_types:
+        errors.append("--gamma-n-steps requires --properties gamma")
+    if "displacement_points" in overrides and "gamma" not in gamma_types:
+        errors.append(
+            "--gamma-displacement-points requires --properties gamma"
+        )
+    parent_lattice = overrides.get("parent_lattice")
+    if parent_lattice is not None and parent_lattice not in {"bcc", "fcc", "hcp"}:
+        errors.append(
+            "--gamma-parent-lattice must be one of bcc, fcc, or hcp"
+        )
+    surface_only = {"n_steps_x", "n_steps_y", "closed_loop"}
+    if surface_only & overrides.keys() and "gamma_surface" not in gamma_types:
+        errors.append(
+            "--gamma-n-steps-x/--gamma-n-steps-y/--gamma-closed-loop "
+            "require --properties gamma_surface"
+        )
+    plane = overrides.get("plane_miller")
+    direction = overrides.get("slip_direction")
+    if plane is not None and not 3 <= len(plane) <= 4:
+        errors.append("--gamma-plane-miller requires 3 or 4 components")
+    if direction is not None and not 3 <= len(direction) <= 4:
+        errors.append("--gamma-slip-direction requires 3 or 4 components")
+    if (
+        plane is not None
+        and direction is not None
+        and len(plane) != len(direction)
+    ):
+        errors.append(
+            "--gamma-plane-miller and --gamma-slip-direction dimensions differ"
+        )
+    for values, option in (
+        (plane, "--gamma-plane-miller"),
+        (direction, "--gamma-slip-direction"),
+    ):
+        if values is not None and (
+            any(not math.isfinite(float(value)) for value in values)
+            or not any(float(value) != 0 for value in values)
+        ):
+            errors.append(f"{option} must be a finite, non-zero vector")
+    for prop_name in gamma_types:
+        effective = copy.deepcopy(PROPERTY_DEFAULTS[prop_name])
+        effective.update(gamma_overrides_for_property(prop_name, overrides))
+        effective_plane = effective["plane_miller"]
+        effective_direction = effective["slip_direction"]
+        if (
+            len(effective_plane) == len(effective_direction)
+            and all(
+                math.isfinite(float(value))
+                for value in effective_plane + effective_direction
+            )
+            and not math.isclose(
+                sum(
+                    float(p) * float(d)
+                    for p, d in zip(effective_plane, effective_direction)
+                ),
+                0.0,
+                abs_tol=1.0e-10,
+            )
+        ):
+            errors.append(
+                f"{prop_name}: --gamma-slip-direction must lie on "
+                "--gamma-plane-miller in the selected crystallographic "
+                "basis (the parent basis when --gamma-parent-lattice is set)"
+            )
+    supercell = overrides.get("supercell_size")
+    if supercell is not None:
+        for index, value in enumerate(supercell[:2]):
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value <= 0
+            ):
+                errors.append(
+                    f"--gamma-supercell-size component {index + 1} "
+                    "must be a positive integer"
+                )
+        if (
+            not math.isfinite(float(supercell[2]))
+            or float(supercell[2]) <= 0
+        ):
+            errors.append(
+                "--gamma-supercell-size plane count must be positive and finite"
+            )
+    for key, option in (
+        ("min_slab_height", "--gamma-min-slab-height"),
+        ("min_distance", "--gamma-min-distance"),
+    ):
+        if key in overrides:
+            value = float(overrides[key])
+            minimum_ok = value > 0 if key == "min_slab_height" else value >= 0
+            if not math.isfinite(value) or not minimum_ok:
+                qualifier = "positive" if key == "min_slab_height" else "non-negative"
+                errors.append(f"{option} must be {qualifier} and finite")
+    if "vacuum_size" in overrides:
+        value = float(overrides["vacuum_size"])
+        if not math.isfinite(value) or value < 0:
+            errors.append(
+                "--gamma-vacuum-size must be non-negative and finite"
+            )
+    if "require_orthogonal_cell" in overrides and not isinstance(
+        overrides["require_orthogonal_cell"], bool
+    ):
+        errors.append("--gamma-require-orthogonal-cell must be a boolean flag")
+    if "max_atoms" in overrides and (
+        not isinstance(overrides["max_atoms"], int)
+        or isinstance(overrides["max_atoms"], bool)
+        or overrides["max_atoms"] <= 0
+    ):
+        errors.append("--gamma-max-atoms must be a positive integer")
+    for key, option in (
+        ("n_steps", "--gamma-n-steps"),
+        ("n_steps_x", "--gamma-n-steps-x"),
+        ("n_steps_y", "--gamma-n-steps-y"),
+    ):
+        if key in overrides and (
+            not isinstance(overrides[key], int)
+            or isinstance(overrides[key], bool)
+            or overrides[key] <= 0
+        ):
+            errors.append(f"{option} must be a positive integer")
+    if "closed_loop" in overrides and not isinstance(
+        overrides["closed_loop"], bool
+    ):
+        errors.append("--gamma-closed-loop must be a boolean flag")
+    if "displacement_points" in overrides:
+        points = overrides["displacement_points"]
+        if (
+            not points
+            or any(
+                not math.isfinite(float(value))
+                or not 0.0 <= float(value) <= 1.0
+                for value in points
+            )
+            or len(set(points)) != len(points)
+            or 0.0 not in points
+        ):
+            errors.append(
+                "--gamma-displacement-points must include 0 and contain "
+                "unique finite values in [0, 1]"
+            )
+    return errors
+
+
+def melting_overrides_from_args(args) -> dict:
+    """Collect explicitly supplied melting-point settings."""
+    overrides = {}
+    temperatures = getattr(args, "melting_temperatures", None)
+    if temperatures is not None:
+        overrides["temperature"] = _normalized_numeric_sequence(temperatures)
+    replicas = getattr(args, "melting_replicas", None)
+    if replicas is not None:
+        overrides["replicas"] = replicas
+    restart_files = getattr(args, "melting_restart_files", None)
+    if restart_files is not None:
+        overrides["restart_files"] = list(restart_files)
+    return overrides
+
+
+def validate_melting_cli_options(properties: list, overrides: dict) -> list:
+    """Validate scoped melting-point CLI options before ticket conversion."""
+    if not overrides:
+        return []
+    if "melting_point" not in set(properties):
+        return [
+            "--melting-* options require --properties melting_point"
+        ]
+    errors = []
+    temperatures = overrides.get(
+        "temperature",
+        PROPERTY_DEFAULTS["melting_point"]["cal_setting"]["temperature"],
+    )
+    if (
+        not temperatures
+        or any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) <= 0
+            for value in temperatures
+        )
+    ):
+        errors.append(
+            "--melting-temperatures must contain positive finite values"
+        )
+    replicas = overrides.get("replicas", 1)
+    if (
+        not isinstance(replicas, int)
+        or isinstance(replicas, bool)
+        or replicas < 1
+    ):
+        errors.append("--melting-replicas must be a positive integer")
+    restart_files = overrides.get("restart_files")
+    if restart_files is not None:
+        if len(restart_files) != len(temperatures):
+            errors.append(
+                "--melting-restart-files requires exactly one file per "
+                "melting temperature"
+            )
+        missing = [path for path in restart_files if not Path(path).is_file()]
+        if missing:
+            errors.append(
+                "--melting-restart-files not found: " + ", ".join(missing)
+            )
+    return errors
+
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+def validate_config(backend: str, potential: str, properties: list):
+    """Validate configuration consistency."""
+    errors = []
+
+    # Check LAMMPS-only properties
+    if backend != "lammps":
+        lammps_props = set(properties) & LAMMPS_ONLY
+        if lammps_props:
+            errors.append(
+                f"Properties {lammps_props} are LAMMPS-only but backend is '{backend}'"
+            )
+
+    # Check potential is valid for LAMMPS
+    valid_potentials = {
+        "deepmd", "mace", "nep", "gap", "snap", "rann",
+        "eam_alloy", "eam_fs", "meam", "meam_spline"
+    }
+    if backend == "lammps" and potential not in valid_potentials:
+        errors.append(f"Unknown LAMMPS potential type: '{potential}'")
+
+    return errors
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def parse_str_map(map_str: str) -> dict:
+    """Parse a string map like 'Element1:value1,Element2:value2'."""
+    if not map_str:
+        return None
+    result = {}
+    for pair in map_str.split(","):
+        parts = pair.strip().split(":")
+        if len(parts) == 2:
+            result[parts[0].strip()] = parts[1].strip()
+    return result
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Create APEX configs or refresh an existing global.json."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    create = subparsers.add_parser(
+        "create", help="Generate a complete APEX job directory"
+    )
+    create.add_argument(
+        "--structure", "-s", nargs="+", action="extend", default=[],
+        help="Structure file(s) (POSCAR/CIF/VASP). Repeatable / space-separated.",
+    )
+    create.add_argument(
+        "--structure-dir", nargs="+", action="extend", default=[],
+        help=(
+            "Directory(ies) of structures. Collects POSCAR/CONTCAR/STRU and "
+            "*.vasp/*.cif/*.xyz, plus immediate child dirs that contain those files."
+        ),
+    )
+    create.add_argument("--backend", "-b", required=True,
+                        choices=["lammps", "abacus", "vasp"],
+                        help="Calculator backend")
+    create.add_argument("--accuracy", choices=list(LAMMPS_ACCURACY), default="precise",
+                        help="LAMMPS: screening=1e-4, balanced=1e-5, precise=1e-6 (default)")
+    create.add_argument("--ftol", type=float,
+                        help="Explicit positive LAMMPS force tolerance; overrides accuracy preset")
+    subparsers.add_parser("describe-parameters", help="Show parameter guidance without credentials")
+    create.add_argument("--potential", "-p",
+                        help="LAMMPS potential type (deepmd/mace/nep/eam_alloy/...)")
+    create.add_argument("--model", "-m",
+                        help="Model/potential file path")
+    create.add_argument(
+        "--runtime-profile",
+        choices=[DPA4_RUNTIME_PROFILE],
+        help=(
+            "Select the released image-resident model, image and machine configuration."
+        ),
+    )
+    create.add_argument("--properties", nargs="+", required=True,
+                        help="Property types to calculate")
+    create.add_argument(
+        "--property-config",
+        help=(
+            "Confirmed JSON property list (or object with a properties list). "
+            "Requested --properties are selected in command-line order."
+        ),
+    )
+    create.add_argument(
+        "--gamma-parent-lattice", choices=("bcc", "fcc", "hcp"),
+        help=(
+            "Explicit parent lattice for RSS/disordered Gamma inputs; Miller "
+            "indices are interpreted in this parent basis"
+        ),
+    )
+    create.add_argument(
+        "--gamma-plane-miller", nargs="+", type=float,
+        help=(
+            "Gamma slip-plane indices in the selected crystallographic basis "
+            "(parent basis when --gamma-parent-lattice is set)"
+        ),
+    )
+    create.add_argument(
+        "--gamma-slip-direction", nargs="+", type=float,
+        help=(
+            "Gamma slip-direction components in the selected crystallographic "
+            "basis (parent basis when --gamma-parent-lattice is set)"
+        ),
+    )
+    create.add_argument(
+        "--gamma-supercell-size", nargs=3, type=float,
+        metavar=("X", "Y", "PLANES"),
+        help="Gamma in-plane repeats and target Miller-plane spacings",
+    )
+    create.add_argument(
+        "--gamma-vacuum-size", type=float, metavar="ANGSTROM",
+        help="Gamma/GammaSurface vacuum thickness (core default: 20 A)",
+    )
+    create.add_argument(
+        "--gamma-require-orthogonal-cell",
+        action="store_true",
+        default=None,
+        help=(
+            "Fail unless Gamma/GammaSurface generates an orthogonal "
+            "Cartesian-z zero-tilt slab; never changes periodic boundaries"
+        ),
+    )
+    create.add_argument(
+        "--gamma-min-slab-height", type=float, metavar="ANGSTROM",
+        help="Minimum material thickness for Gamma slabs",
+    )
+    create.add_argument(
+        "--gamma-max-atoms", type=int, metavar="COUNT",
+        help="Maximum allowed atom count for a generated Gamma slab",
+    )
+    create.add_argument(
+        "--gamma-min-distance", type=float, metavar="ANGSTROM",
+        help="Minimum allowed periodic atom-pair distance",
+    )
+    create.add_argument(
+        "--gamma-n-steps", type=int, metavar="COUNT",
+        help="Gamma-line increments (the generated point count is COUNT + 1)",
+    )
+    create.add_argument(
+        "--gamma-displacement-points", nargs="+", type=float,
+        metavar="FRACTION",
+        help=(
+            "Explicit Gamma-line fractions in [0,1]; must be unique and "
+            "include 0, and overrides the n_steps grid"
+        ),
+    )
+    create.add_argument(
+        "--gamma-n-steps-x", type=int, metavar="COUNT",
+        help="Gamma-surface increments along the x slip vector",
+    )
+    create.add_argument(
+        "--gamma-n-steps-y", type=int, metavar="COUNT",
+        help="Gamma-surface increments along the y slip vector",
+    )
+    create.add_argument(
+        "--gamma-closed-loop", action="store_true", default=None,
+        help="Derive periodic in-plane vectors for gamma_surface",
+    )
+    create.add_argument(
+        "--melting-temperatures", nargs="+", type=float, metavar="K",
+        help="Target temperatures for melting_point",
+    )
+    create.add_argument(
+        "--melting-replicas", type=int, metavar="COUNT",
+        help="Independent velocity-seed replicas per melting temperature",
+    )
+    create.add_argument(
+        "--melting-restart-files", nargs="+", metavar="PATH",
+        help=(
+            "One existing coexistence restart per melting temperature; each "
+            "is staged and forwarded as restart.coexistence.start"
+        ),
+    )
+    create.add_argument("--flow-type", default="joint",
+                        choices=["joint", "relax", "props"],
+                        help="Workflow type (default: joint)")
+    create.add_argument("--workflow-name", "-n",
+                        help="Workflow name (auto-lowercased for RFC 1123 compliance)")
+    create.add_argument("--output-dir", "-o", default="./apex_job",
+                        help="Output directory for configs")
+    create.add_argument(
+        "--access-key",
+        help="Bohrium access key (or set BOHRIUM_ACCESS_KEY env var)",
+    )
+    create.add_argument(
+        "--project-id", type=int,
+        help="Bohrium project ID (or set BOHRIUM_PROJECT_ID)",
+    )
+    create.add_argument("--sandbox", action="store_true",
+                        help="Use OpenAPI Sandbox mode (access_key auth, no ticket)")
+    create.add_argument("--machine-type",
+                        help="Override machine_type for sandbox (e.g. 'c16_m120_1 * NVIDIA L20')")
+    create.add_argument("--scass-type",
+                        help="Override scass_type for inner dflow containers (legacy Bohrium)")
+    create.add_argument("--run-command",
+                        help="Override calculator run command")
+    create.add_argument(
+        "--lammps-image",
+        help=(
+            "Explicit LAMMPS calculator image. The image × machine pair is "
+            "validated before config generation."
+        ),
+    )
+    create.add_argument(
+        "--vasp-image",
+        help=(
+            "Licensed VASP image URL/name for global.json vasp_image_name. "
+            "Required for --backend vasp. Resolve via Bohrium list_images "
+            "(keyword=vasp) or a user-known authorized address — never invent."
+        ),
+    )
+    create.add_argument("--incar",
+                        help="INCAR/INPUT file path (for VASP/ABACUS)")
+    create.add_argument("--potcar-prefix",
+                        help="POTCAR prefix directory (for VASP/ABACUS)")
+    create.add_argument(
+        "--potcars",
+        help="POTCAR mapping as 'Element1:potcar1,Element2:potcar2'",
+    )
+    create.add_argument(
+        "--orb-files",
+        help="Orbital files as 'Element1:file1,Element2:file2' (ABACUS)",
+    )
+
+    refresh = subparsers.add_parser(
+        "refresh-global",
+        help="Refresh ticket and project IDs without changing param.json",
+    )
+    refresh.add_argument(
+        "--global", "-g", dest="global_json", required=True,
+        help="Existing global.json to update atomically",
+    )
+    refresh.add_argument(
+        "--access-key",
+        help="Bohrium access key (or set BOHRIUM_ACCESS_KEY env var)",
+    )
+    refresh.add_argument(
+        "--project-id", type=int,
+        help="Bohrium project ID (or set BOHRIUM_PROJECT_ID)",
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "describe-parameters":
+        print(json.dumps({"lammps_accuracy": LAMMPS_ACCURACY, "default": "precise",
+                          "properties": sorted(PROPERTY_DEFAULTS),
+                          "precedence": "explicit property cal_setting > --ftol > --accuracy",
+                          "validation": "Run validate_inputs.py --param param.json --global global.json inside the generated job directory.",
+                          "diagnosis": "Running is not convergence evidence; inspect LAMMPS steps, forces, stopping criterion and timestamps."}, indent=2))
+        return
+    if args.command == "create":
+        unknown = set(args.properties) - set(PROPERTY_DEFAULTS)
+        if unknown:
+            parser.error("Unknown properties: " + ", ".join(sorted(unknown)))
+        if args.backend != "lammps" and (args.ftol is not None or args.accuracy != "precise"):
+            parser.error("--accuracy/--ftol apply only to LAMMPS")
+        try:
+            selected_ftol = resolve_lammps_ftol(args.accuracy, args.ftol)
+        except ValueError as exc:
+            parser.error(str(exc))
+
+    if args.command == "refresh-global":
+        try:
+            config = refresh_global_json(
+                args.global_json,
+                access_key=args.access_key,
+                project_id=args.project_id,
+            )
+        except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+        pid = validate_project_id_types(config)
+        print(f"Refreshed: {Path(args.global_json).resolve()}")
+        print("Hard type check passed:")
+        id_field = "project_id" if str(config.get("context_type", "")).lower() == "openapi" else "program_id"
+        print(f"  {id_field}={pid!r} type={type(pid).__name__}")
+        project_id = config["bohrium_config"]["project_id"]
+        print(
+            "  bohrium_config.project_id="
+            f"{project_id!r} type={type(project_id).__name__}"
+        )
+        return
+
+    # -------------------------------------------------------------------------
+    # Parse complex arguments
+    # -------------------------------------------------------------------------
+    potcars = parse_str_map(args.potcars)
+    orb_files = parse_str_map(args.orb_files)
+
+    # -------------------------------------------------------------------------
+    # Resolve structures (--structure and/or --structure-dir)
+    # -------------------------------------------------------------------------
+    try:
+        structure_sources = resolve_structure_sources(
+            args.structure, args.structure_dir
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+    structure_layout = plan_structure_layout(structure_sources)
+    structure_paths = [item["rel_dir"] for item in structure_layout]
+    print(
+        f"Resolved {len(structure_layout)} structure(s): "
+        + ", ".join(structure_paths)
+    )
+
+    # -------------------------------------------------------------------------
+    # Validate
+    # -------------------------------------------------------------------------
+    gamma_overrides = gamma_overrides_from_args(args)
+    melting_overrides = melting_overrides_from_args(args)
+    errors = validate_config(
+        args.backend,
+        "deepmd" if args.runtime_profile else args.potential,
+        args.properties,
+    )
+    if args.lammps_image and args.backend != "lammps":
+        errors.append("--lammps-image is only valid with --backend lammps")
+    runtime_profile = None
+    if args.runtime_profile:
+        try:
+            runtime_profile = _load_dpa4_runtime_profile(args.runtime_profile)
+            if runtime_profile.get("enabled_pending_e2e"):
+                print("NOTICE: tongqi release enabled; see profile.openapi_qualification for recorded execution evidence.", file=sys.stderr)
+        except (OSError, ValueError, RuntimeError) as exc:
+            errors.append(str(exc))
+        if args.backend != "lammps":
+            errors.append(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} requires "
+                "--backend lammps"
+            )
+        if args.potential not in (None, "deepmd"):
+            errors.append(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} requires "
+                "--potential deepmd"
+            )
+        if args.model:
+            errors.append(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} uses the "
+                "image-resident PT2 artifact; do not pass --model"
+            )
+        if args.lammps_image:
+            errors.append(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} fixes the image; "
+                "do not pass --lammps-image"
+            )
+        if (getattr(args, "sandbox", False) or os.environ.get(
+            "BOHRIUM_USE_SANDBOX"
+        ) == "1") and (runtime_profile or {}).get("openapi_qualification", {}).get("status") != "passed":
+            errors.append(
+                f"--runtime-profile {DPA4_RUNTIME_PROFILE} is not qualified "
+                "for the OpenAPI Sandbox backend"
+            )
+        args.potential = "deepmd"
+    errors.extend(
+        validate_gamma_cli_options(args.properties, gamma_overrides)
+    )
+    errors.extend(
+        validate_melting_cli_options(args.properties, melting_overrides)
+    )
+    if errors:
+        for err in errors:
+            print(f"ERROR: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    confirmed_property_configs = None
+    if args.property_config:
+        try:
+            confirmed_property_configs = load_confirmed_property_configs(
+                args.property_config, args.properties
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    # -------------------------------------------------------------------------
+    # Sanitize workflow name (RFC 1123)
+    # -------------------------------------------------------------------------
+    if args.workflow_name:
+        workflow_name = sanitize_workflow_name(args.workflow_name)
+        if workflow_name != args.workflow_name:
+            print(f"Workflow name sanitized: '{args.workflow_name}' → '{workflow_name}'")
+    else:
+        # Auto-generate from first structure basename and properties
+        first_stem = structure_layout[0]["conf_name"].lower()
+        if len(structure_layout) > 1:
+            first_stem = f"{first_stem}-n{len(structure_layout)}"
+        props_str = "-".join(args.properties[:3])  # First 3 properties
+        workflow_name = sanitize_workflow_name(f"{first_stem}-{props_str}")
+        print(f"Auto-generated workflow name: '{workflow_name}'")
+
+    # -------------------------------------------------------------------------
+    # Build global.json (includes ticket conversion or sandbox direct auth)
+    # -------------------------------------------------------------------------
+    if args.backend == "vasp" and not (args.vasp_image or "").strip():
+        print(
+            "ERROR: --backend vasp requires --vasp-image. Resolve a licensed "
+            "image with Bohrium list_images (keyword=vasp) / "
+            "scripts/list_bohrium_images.py, or use a user-known authorized "
+            "address. If neither exists, stop the VASP workflow.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    use_sandbox = getattr(args, "sandbox", False) or os.environ.get("BOHRIUM_USE_SANDBOX") == "1"
+
+    if use_sandbox:
+        print("Building OpenAPI Sandbox config (no ticket needed)...")
+        global_config = build_global_json_sandbox(
+            backend=args.backend,
+            potential=args.potential,
+            access_key=args.access_key,
+            project_id=args.project_id,
+            machine_type=getattr(args, "machine_type", None),
+            run_command=args.run_command,
+            vasp_image=args.vasp_image,
+            lammps_image=args.lammps_image,
+            runtime_profile=runtime_profile,
+        )
+        print(f"Sandbox config built: machine_type={global_config['machine_type']}")
+    else:
+        print("Converting access_key to dflow ticket...")
+        global_config = build_global_json(
+            backend=args.backend,
+            potential=args.potential,
+            access_key=args.access_key,
+            project_id=args.project_id,
+            scass_type=args.scass_type,
+            run_command=args.run_command,
+            vasp_image=args.vasp_image,
+            lammps_image=args.lammps_image,
+            runtime_profile=runtime_profile,
+        )
+        validate_project_id_types(global_config)
+        print(f"Ticket obtained: {global_config['bohrium_config']['ticket'][:8]}...")
+
+    # -------------------------------------------------------------------------
+    # Create output directory and copy files
+    # -------------------------------------------------------------------------
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for item in structure_layout:
+        dest_dir = output_dir / item["rel_dir"]
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_dir / item["dest_name"]
+        shutil.copy2(item["source"], dest_file)
+        print(f"Copied structure to {dest_file}")
+
+    staged_model = args.model
+    if args.backend == "lammps" and runtime_profile is None:
+        try:
+            staged_model = stage_lammps_model(args.model, output_dir)
+        except (OSError, ValueError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    # Melting restart inputs are a temperature-indexed transport mechanism.
+    # Stage them in the job root and let MeltingPoint copy the matching input
+    # to each replica as restart.coexistence.start. FiniteTlatt never receives
+    # these files.
+    if "restart_files" in melting_overrides:
+        staged_restarts = []
+        for index, source_text in enumerate(melting_overrides["restart_files"]):
+            source = Path(source_text)
+            dest_name = f"melting_restart_{index:06d}{source.suffix}"
+            destination = output_dir / dest_name
+            shutil.copy2(source, destination)
+            staged_restarts.append(dest_name)
+            print(f"Copied melting restart to {destination}")
+        melting_overrides["restart_files"] = staged_restarts
+
+    # Stage VASP POTCAR (+ INCAR) into the job. Absolute host libraries such as
+    # /share/PAW_PBE are invisible inside Bohrium/dflow containers.
+    staged_prefix = args.potcar_prefix
+    staged_potcars = potcars
+    staged_incar = args.incar
+    if args.backend == "vasp":
+        try:
+            staged_prefix, staged_potcars = stage_vasp_potcars(
+                output_dir, args.potcar_prefix, potcars
+            )
+        except (OSError, ValueError, FileNotFoundError, PermissionError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            print(
+                "POTCAR must be readable locally and will be copied into the "
+                "job root as POTCAR_<Element> with potcar_prefix='.'. "
+                "Confirm --potcar-prefix and --potcars.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.incar and os.path.isfile(args.incar):
+            incar_dest = output_dir / "INCAR"
+            shutil.copy2(args.incar, incar_dest)
+            staged_incar = "INCAR"
+            print(f"Copied INCAR to {incar_dest}")
+        else:
+            staged_incar = "INCAR"
+            print(
+                "WARNING: no --incar file copied; place INCAR in the job dir "
+                "before submit",
+                file=sys.stderr,
+            )
+
+    # -------------------------------------------------------------------------
+    # ABACUS: auto-download pp/orb if not provided
+    # -------------------------------------------------------------------------
+    if args.backend == "abacus" and not staged_potcars:
+        # Detect elements from structure files
+        from pymatgen.core import Structure
+        elements_set = set()
+        for item in structure_layout:
+            try:
+                struct = Structure.from_file(str(item["source"]))
+                for site in struct.sites:
+                    elements_set.add(str(site.specie))
+            except Exception:
+                pass
+        if elements_set:
+            print(f"ABACUS: auto-downloading PP/ORB for elements: {sorted(elements_set)}")
+            staged_potcars, orb_files = download_abacus_pp_orb(
+                sorted(elements_set), output_dir
+            )
+            staged_prefix = "pp_orb"
+        else:
+            print("WARNING: Could not detect elements; provide --potcars manually")
+
+    # -------------------------------------------------------------------------
+    # ABACUS: auto-generate INPUT template if not provided
+    # -------------------------------------------------------------------------
+    if args.backend == "abacus" and not staged_incar:
+        input_path = output_dir / "INPUT"
+        if not input_path.exists():
+            input_content = """INPUT_PARAMETERS
+suffix              ABACUS
+ntype               {ntype}
+ecutwfc             100
+scf_thr             1e-7
+scf_nmax            100
+basis_type          lcao
+calculation         scf
+cal_stress          1
+cal_force           1
+kspacing            0.12
+smearing_method     gaussian
+smearing_sigma      0.01
+mixing_type         broyden
+mixing_beta         0.7
+""".format(ntype=len(staged_potcars) if staged_potcars else 1)
+            input_path.write_text(input_content)
+            staged_incar = "INPUT"
+            print(f"Generated ABACUS INPUT template: {input_path}")
+            print("  NOTE: suffix=ABACUS (required by fpop); ecutwfc=100Ry; kspacing=0.12")
+
+    # -------------------------------------------------------------------------
+    # Build interaction + param.json (after staging so paths are job-relative)
+    # -------------------------------------------------------------------------
+    interaction = build_interaction(
+        backend=args.backend,
+        potential=args.potential,
+        model=staged_model,
+        incar=staged_incar,
+        potcar_prefix=staged_prefix,
+        potcars=staged_potcars,
+        orb_files=orb_files,
+        runtime_profile=runtime_profile,
+    )
+    param_config = build_param_json(
+        structure_paths,
+        interaction,
+        args.properties,
+        args.flow_type,
+        gamma_overrides=gamma_overrides,
+        property_configs=confirmed_property_configs,
+        melting_overrides=melting_overrides,
+        lammps_ftol=selected_ftol,
+    )
+
+    # -------------------------------------------------------------------------
+    # Write configs
+    # -------------------------------------------------------------------------
+    global_path = output_dir / "global.json"
+    with open(global_path, "w") as f:
+        json.dump(global_config, f, indent=4)
+    print(f"Written: {global_path}")
+    pid = validate_project_id_types(global_config)
+    print(
+        "Hard type check passed: "
+        f"program_id={pid!r} type={type(pid).__name__}; "
+        "bohrium_config.project_id="
+        f"{global_config['bohrium_config']['project_id']!r} "
+        f"type={type(global_config['bohrium_config']['project_id']).__name__}"
+    )
+
+    param_path = output_dir / "param.json"
+    with open(param_path, "w") as f:
+        json.dump(param_config, f, indent=4)
+    print(f"Written: {param_path}")
+    if args.backend == "vasp":
+        print(
+            "VASP potcar_prefix rewritten to job-relative "
+            f"'{staged_prefix}' (do not keep absolute /share/... paths)."
+        )
+
+    # Verify the image runtime before submitting with the same interpreter.
+    shutil.copyfile(Path(__file__).with_name("ensure_apex.py"),
+                    output_dir / "ensure_apex.py")
+    run_script = output_dir / "run.sh"
+    cmd = f'python3 -m apex submit param.json -c global.json -f {args.flow_type} -n "{workflow_name}"'
+    with open(run_script, "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("set -eo pipefail\n\n")
+        f.write("python3 ensure_apex.py\n\n")
+        f.write(
+            "# Authentication is already stored in global.json by "
+            "generate_config.py.\n"
+        )
+        f.write("set +eo pipefail\n")
+        f.write(f"{cmd} 2>&1 | tee apex_submit.log\n")
+        f.write("EXIT_CODE=${PIPESTATUS[0]}\n")
+        f.write("set -eo pipefail\n\n")
+        f.write("if [ $EXIT_CODE -eq 0 ]; then\n")
+        f.write(
+            '    echo "=== APEX workflow completed and results retrieved ==="\n'
+        )
+        f.write('    echo "Retain apex_submit.log and the workflow ID."\n')
+        f.write("    exit 0\n")
+        f.write("else\n")
+        f.write('    echo "APEX failed (exit $EXIT_CODE)"\n')
+        f.write("    tail -50 apex_submit.log 2>/dev/null || true\n")
+        f.write("    exit 1\n")
+        f.write("fi\n")
+    os.chmod(run_script, 0o755)
+    print(f"Written: {run_script}")
+
+    # Keep a minimal submit.sh for an already-verified local environment.
+    submit_script = output_dir / "submit.sh"
+    with open(submit_script, "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("# APEX submission command (run inside APEX container)\n")
+        f.write(f"# Workflow name: {workflow_name}\n")
+        f.write(f"# Flow type: {args.flow_type}\n")
+        f.write(
+            "# Prefer run.sh for Bohrium outer jobs (it verifies/reuses the image runtime).\n\n"
+        )
+        f.write(f"{cmd}\n")
+    os.chmod(submit_script, 0o755)
+    print(f"Written: {submit_script}")
+
+    # -------------------------------------------------------------------------
+    # Print summary
+    # -------------------------------------------------------------------------
+    print(f"\n{'='*60}")
+    print(f"APEX Job Configuration Generated")
+    print(f"{'='*60}")
+    print(f"Backend:        {args.backend}")
+    if args.backend == "lammps":
+        print("Effective convergence settings: " + json.dumps({"relaxation": param_config.get("relaxation"), "properties": [{"type": p["type"], "cal_setting": p.get("cal_setting", {})} for p in param_config.get("properties", [])]}))
+    if args.potential:
+        print(f"Potential:      {args.potential}")
+    print(f"Structures:     {len(structure_paths)} ({', '.join(structure_paths)})")
+    print(f"Properties:     {', '.join(args.properties)}")
+    for prop in param_config.get("properties", []):
+        if prop.get("type") in {"gamma", "gamma_surface"}:
+            if prop["type"] == "gamma":
+                task_count = (
+                    len(prop["displacement_points"])
+                    if prop.get("displacement_points") is not None
+                    else int(prop.get("n_steps", 10)) + 1
+                )
+            else:
+                task_count = (
+                    int(prop.get("n_steps_x", prop.get("n_steps", 10))) + 1
+                ) * (
+                    int(
+                        prop.get(
+                            "n_steps_y",
+                            prop.get("n_steps_x", prop.get("n_steps", 10)),
+                        )
+                    ) + 1
+                )
+            print(
+                "Gamma config:   "
+                + json.dumps(prop, sort_keys=True)
+            )
+            print(f"Gamma tasks:    {task_count}")
+        elif prop.get("type") == "melting_point":
+            cal = prop.get("cal_setting", {})
+            task_count = len(cal.get("temperature", [])) * int(
+                cal.get("replicas", 1)
+            )
+            print(
+                "Melting config: "
+                + json.dumps(prop, sort_keys=True)
+            )
+            print(f"Melting tasks:  {task_count}")
+    print(f"Flow type:      {args.flow_type}")
+    print(f"Workflow name:  {workflow_name}")
+    if use_sandbox:
+        print(f"machine_type:   {global_config.get('machine_type', 'N/A')}")
+        print(f"context_type:   OpenAPI (Sandbox)")
+    else:
+        print(f"scass_type:     {global_config.get('scass_type', 'N/A')}")
+    print(f"Output dir:     {output_dir}")
+    print(f"\nBohrium submit command (for outer job):")
+    print(f"  cmd: {cmd}")
+    print(f"\nOuter job image: {APEX_IMAGE}")
+    if use_sandbox:
+        print(f"Outer job machine: c2_m4_cpu (sandbox lightweight client)")
+    else:
+        print(f"Outer job machine: c1_m2_cpu (recommended lightweight client)")
+
+
+if __name__ == "__main__":
+    main()
