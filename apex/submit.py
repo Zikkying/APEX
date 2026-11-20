@@ -64,6 +64,7 @@ DPA4_PHONOLAMMPS_RUN_COMMAND = (
 DPA4_GROUP_SIZE = 1
 DPA4_POOL_SIZE = 1
 DPA4_DISPATCHER_COMMAND = "python3"
+DPA4_REMOTE_COMMAND = "/usr/local/bin/dpa4-python"
 DPA4_JOB_TYPE = "container"
 DPA4_PLATFORM = "ali"
 _HEX_SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -417,13 +418,10 @@ def _validate_dpa4_execution_config(
             "effective dispatcher command must remain the single-process "
             f"default {DPA4_DISPATCHER_COMMAND!r}"
         )
-    if openapi and dispatcher.get("remote_command") != "/usr/local/bin/dpa4-python":
-        errors.append("DPA4 OpenAPI remote_command must use /usr/local/bin/dpa4-python")
-    if not openapi and dispatcher.get("remote_command") not in (None, ""):
-        errors.append(
-            "dispatcher remote_command is prohibited for DPA4 because it can "
-            "bypass the audited one-rank wrapper"
-        )
+    remote_command = dispatcher.get("remote_command")
+    allowed_remote_commands = (DPA4_REMOTE_COMMAND,) if openapi else (DPA4_REMOTE_COMMAND, None, "")
+    if remote_command not in allowed_remote_commands:
+        errors.append(f"DPA4 dispatcher remote_command must use {DPA4_REMOTE_COMMAND}")
 
     basic = wf_config.basic_config_dict
     if basic.get("lammps_run_command") != DPA4_LAMMPS_RUN_COMMAND:
@@ -1148,7 +1146,17 @@ def submit_workflow(
     post_image = make_image
     group_size = wf_config.basic_config_dict["group_size"]
     pool_size = wf_config.basic_config_dict["pool_size"]
-    executor = wf_config.get_executor(wf_config.dispatcher_config_dict)
+    dispatcher_config = wf_config.dispatcher_config_dict
+    if runtime_contract == DPA4_RUNTIME_KIND:
+        machine = dispatcher_config["machine_dict"]
+        if machine["context_type"] == "Bohrium":
+            # dflow otherwise copies the digest-qualified template image into
+            # imageName, which the Bohrium Job API accepts only as a tag.
+            dispatcher_config = copy.deepcopy(dispatcher_config)
+            input_data = dispatcher_config["machine_dict"]["remote_profile"]["input_data"]
+            input_data["image_name"] = run_image.split("@", 1)[0]
+            dispatcher_config["remote_command"] = DPA4_REMOTE_COMMAND
+    executor = wf_config.get_executor(dispatcher_config)
 
     # upload necessary python dependencies
     upload_python_packages = wf_config.basic_config_dict["upload_python_packages"]

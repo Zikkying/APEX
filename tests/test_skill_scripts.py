@@ -389,6 +389,9 @@ class TestGenerateConfigHelpers(unittest.TestCase):
             global_config["scass_type"], "1 * NVIDIA L20_48g"
         )
         self.assertEqual(
+            global_config["dispatcher_remote_command"], "/usr/local/bin/dpa4-python"
+        )
+        self.assertEqual(
             global_config["lammps_run_command"],
             "/usr/local/bin/dpa4-lmp -in in.lammps",
         )

@@ -28,6 +28,8 @@ Generate with `scripts/generate_config.py create` using the approved inputs.
 Cloud/MM uses `BOHRIUM_ACCESS_KEY` and `BOHRIUM_PROJECT_ID` (or `--project-id`);
 the generator writes `param.json`, `global.json` and `bohrium_config.ticket`.
 Set `"type_map": "auto"`. Add `--sandbox` for inner OpenAPI execution.
+For tongqi on Bohrium Job, use an outer APEX client with the Job API
+image-tag and DPA4 Python fixes. Keep the generated image fields for either route.
 Consult `create --help` or `describe-parameters` when needed.
 
 ## 2. Check once and submit

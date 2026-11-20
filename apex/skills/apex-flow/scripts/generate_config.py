@@ -722,6 +722,7 @@ def build_global_json(backend: str, potential: str = None,
         if command:
             config["phonolammps_run_command"] = command
     if dpa4_profile is not None:
+        config["dispatcher_remote_command"] = "/usr/local/bin/dpa4-python"
         config["phonolammps_run_command"] = dpa4_profile["calculator"][
             "phonolammps_command"
         ]

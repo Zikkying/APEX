@@ -2,7 +2,7 @@ import unittest
 import tempfile
 import os
 import json
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import apex.submit as submit_module
 from apex.submit import (
@@ -514,6 +514,54 @@ class TestSubmitPathValidation(unittest.TestCase):
         self.assertIn("APEX_LAMMPS_HEADER_RETRY=4", captured["run_command"])
         self.assertTrue(captured["run_command"].endswith("lmp -in in.lammps"))
         mocked_submit.assert_called_once()
+
+    def test_dpa4_dispatcher_uses_image_python_and_bohrium_job_tag(self):
+        image = submit_module._dpa4_image_name()
+        properties = {"properties": [{"type": "eos"}]}
+        for context in ("Bohrium", "OpenAPI"):
+            settings = {
+                "context_type": context,
+                "batch_type": context,
+                "platform": "ali",
+                "group_size": 1,
+                "pool_size": 1,
+                "lammps_image_name": image,
+                "lammps_run_command": submit_module.DPA4_LAMMPS_RUN_COMMAND,
+            }
+            if context == "OpenAPI":
+                settings.update(
+                    machine_type="c16_m120_1 * NVIDIA L20",
+                    image_address=image,
+                    dispatcher_remote_command="/usr/local/bin/dpa4-python",
+                )
+            else:
+                settings["scass_type"] = submit_module.DPA4_SCASS_TYPE
+            with (
+                self.subTest(context=context),
+                tempfile.TemporaryDirectory() as work_dir,
+                patch.object(submit_module, "judge_flow",
+                             return_value=(object(), "lammps", "props", None, properties)),
+                patch.object(submit_module, "_validate_lammps_runtime_contract",
+                             return_value=submit_module.DPA4_RUNTIME_KIND),
+                patch.object(submit_module, "FlowGenerator") as flow,
+                patch.object(submit_module, "submit"),
+                patch.object(submit_module.Config, "config_dflow"),
+                patch.object(submit_module.Config, "config_bohrium"),
+                patch.object(submit_module.Config, "dflow_s3_config_dict",
+                             new_callable=PropertyMock, return_value={}),
+                patch.object(submit_module.Config, "config_s3"),
+            ):
+                submit_workflow([{}], settings, [work_dir], "props", submit_only=True)
+
+                args = flow.call_args.kwargs
+                self.assertEqual(args["run_image"], image)
+                self.assertEqual(args["executor"].command, ["python3"])
+                self.assertEqual(args["executor"].remote_command, ["/usr/local/bin/dpa4-python"])
+                remote = args["executor"].machine_dict["remote_profile"]
+                if context == "Bohrium":
+                    self.assertEqual(remote["input_data"]["image_name"], image.split("@")[0])
+                else:
+                    self.assertEqual(remote["image_address"], image)
 
     def test_accept_paths_without_dot(self):
         params = [

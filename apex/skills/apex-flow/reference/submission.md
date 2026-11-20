@@ -2,9 +2,11 @@
 
 Current image roles and executable paths: [Runtime images](runtime-images.md).
 
-For tongqi, select `--runtime-profile dpa4-alloytongqi-l20`; add
-`--sandbox` for inner OpenAPI execution. Runtime diagnostics are in [Debug](debug.md).
-
+For tongqi, generate with `--runtime-profile dpa4-alloytongqi-l20`.
+Bohrium Job uses `1 * NVIDIA L20_48g` and requires an outer APEX client
+with the Job API image-tag and DPA4 Python fixes. For OpenAPI, add `--sandbox` to select
+`c16_m120_1 * NVIDIA L20`. Keep the generated digest-qualified image fields
+and use the same `python -m apex submit param.json -c global.json` command.
 
 ## Execution Architecture (Two-Layer Model)
 
@@ -344,11 +346,10 @@ Legacy Bohrium jobs (`context_type=Bohrium`) use `scass_type="1 * NVIDIA L20_48g
   every parameter file, using its real path; this also persists the explicit map.
   Do not guess a map or omit property-specific interactions. The low-level API
   rejects unresolved maps before any cloud submission.
-- Tongqi OpenAPI must set `dispatcher_remote_command` to exactly
+- Both tongqi routes use `dispatcher_remote_command` set to
   `/usr/local/bin/dpa4-python`. This wrapper selects `/opt/mamba/bin/python` and
-  the validated native-library environment. Never replace it with `python3`,
-  `/usr/bin/python3`, or a different Conda interpreter. Generator and core
-  validation enforce this independently of Agent instructions.
+  the image’s native-library environment. The patched APEX client also
+  applies the wrapper when submitting an older Bohrium Job config.
 - The calculation image must contain `numpy`, `monty`, and `ruamel.yaml` in that
   same wrapper environment. APEX's task upload supports the existing slim02
   image; it is not a substitute for dependency checks when building a new image.

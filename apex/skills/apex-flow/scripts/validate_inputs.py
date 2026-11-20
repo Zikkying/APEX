@@ -66,6 +66,7 @@ DPA4_PHONOLAMMPS_RUN_COMMAND = (
 DPA4_GROUP_SIZE = 1
 DPA4_POOL_SIZE = 1
 DPA4_DISPATCHER_COMMAND = "python3"
+DPA4_REMOTE_COMMAND = "/usr/local/bin/dpa4-python"
 DPA4_JOB_TYPE = "container"
 DPA4_PLATFORM = "ali"
 _HEX_SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -296,13 +297,9 @@ def _validate_dpa4_global_contract(
             "DPA4 effective dispatcher command must remain the single-process "
             f"default {DPA4_DISPATCHER_COMMAND!r}"
         )
-    if openapi and effective_remote_command != "/usr/local/bin/dpa4-python":
-        errors.append("DPA4 OpenAPI remote_command must use /usr/local/bin/dpa4-python")
-    if not openapi and effective_remote_command not in (None, ""):
-        errors.append(
-            "DPA4 dispatcher remote_command is prohibited because it can "
-            "bypass the audited one-rank wrapper"
-        )
+    allowed_remote_commands = (DPA4_REMOTE_COMMAND,) if openapi else (DPA4_REMOTE_COMMAND, None, "")
+    if effective_remote_command not in allowed_remote_commands:
+        errors.append(f"DPA4 dispatcher remote_command must use {DPA4_REMOTE_COMMAND}")
 
     if global_config.get("lammps_run_command") != DPA4_LAMMPS_RUN_COMMAND:
         errors.append(
