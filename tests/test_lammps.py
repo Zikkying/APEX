@@ -228,6 +228,29 @@ class TestLammps(unittest.TestCase):
         self.assertNotIn("variable        N equal step", contents)
 
 
+    def test_isotropic_volume_relaxation(self):
+        task_dir = Path(self.equi_path).resolve()
+        shutil.copy(Path("confs/std-fcc/POSCAR"), task_dir / "POSCAR")
+
+        for relax_pos in (False, True):
+            with self.subTest(relax_pos=relax_pos):
+                params = {
+                    "cal_type": "relaxation",
+                    "cal_setting": {
+                        "relax_pos": relax_pos,
+                        "relax_shape": False,
+                        "relax_vol": True,
+                    },
+                }
+                self.Lammps.make_input_file(str(task_dir), "relaxation", params)
+                contents = (task_dir / "in.lammps").read_text()
+                self.assertIn("box/relax iso 0.0", contents)
+                self.assertNotIn("box/relax aniso", contents)
+                self.assertNotIn("box/relax tri", contents)
+                self.assertEqual(
+                    "setforce 0.0 0.0 0.0" in contents, not relax_pos
+                )
+
     def test_forward_common_files(self):
         fc_files = ["in.lammps", "frozen_model.pb"]
         self.assertEqual(self.Lammps.forward_common_files(), fc_files)

@@ -365,6 +365,8 @@ def make_lammps_equi(
     maxeval=500000,
     change_box=True,
     *args,
+    relax_shape=True,
+    relax_pos=True,
     **kwargs
 ):
     type_map_list = element_list(type_map)
@@ -406,12 +408,11 @@ def make_lammps_equi(
     )
     ret += f"dump            1 all custom {dump_step} dump.relax id type xs ys zs fx fy fz\n"
     ret += "min_style       cg\n"
+    if not relax_pos:
+        ret += "fix             freeze_atoms all setforce 0.0 0.0 0.0\n"
     if change_box:
         ret += "fix             1 all box/relax iso 0.0 \n"
-        if is_new_dpmd and prop_type != "relaxation":
-            # detour synchronizing problem of property calculation by doing one minimization only
-            pass
-        else:
+        if relax_shape and not (is_new_dpmd and prop_type != "relaxation"):
             ret += "minimize        %e %e %d %d\n" % (etol, ftol, maxiter, maxeval)
             ret += "fix             1 all box/relax aniso 0.0 \n"
             ret += "minimize        %e %e %d %d\n" % (etol, ftol, maxiter, maxeval)

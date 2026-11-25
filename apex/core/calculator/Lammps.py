@@ -379,7 +379,7 @@ class Lammps(Task):
                         False,
                         prop_type=prop_type,
                     )
-                elif [relax_pos, relax_shape, relax_vol] == [True, True, True]:
+                elif relax_vol and (not relax_shape or relax_pos):
                     fc = lammps_utils.make_lammps_equi(
                         "conf.lmp",
                         self.type_map,
@@ -391,6 +391,8 @@ class Lammps(Task):
                         maxeval,
                         True,
                         prop_type=prop_type,
+                        relax_shape=relax_shape,
+                        relax_pos=relax_pos,
                     )
                 elif [relax_pos, relax_shape, relax_vol] == [
                     True,

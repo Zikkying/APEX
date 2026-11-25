@@ -26,6 +26,13 @@ These parameters appear in most property configurations:
 | `relax_pos` | bool | varies | Allow ionic relaxation |
 | `relax_shape` | bool | varies | Allow cell shape change |
 | `relax_vol` | bool | varies | Allow volume change |
+
+For LAMMPS isotropic cell relaxation, set `relax_shape=false` and
+`relax_vol=true`. Set `relax_pos=false` to keep fractional coordinates fixed
+during uniform scaling, or `true` to relax the atoms as well. Use an APEX
+client that supports these flags. For an EOS scan, use static calculations at
+the requested volumes after this reference-cell relaxation.
+
 | `etol` | float | — | Energy tolerance (LAMMPS) |
 | `ftol` | float | — | Force tolerance (LAMMPS) |
 | `maxiter` | int | — | Max iterations (LAMMPS) |
