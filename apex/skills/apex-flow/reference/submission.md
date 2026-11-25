@@ -8,6 +8,21 @@ with the Job API image-tag and DPA4 Python fixes. For OpenAPI, add `--sandbox` t
 `c16_m120_1 * NVIDIA L20`. Keep the generated digest-qualified image fields
 and use the same `python -m apex submit param.json -c global.json` command.
 
+## Run a staged APEX wheel
+
+For an APEX code update compatible with the current image dependencies, bundle
+the wheel and `scripts/run_apex_wheel.py` in the outer Job input. Run with the
+image's APEX interpreter after the usual input validation:
+
+```bash
+"$PY" run_apex_wheel.py apex_flow-1.3.4-py3-none-any.whl submit param.json -c global.json
+```
+
+The launcher installs the wheel offline into a temporary directory and runs
+APEX with the image's dependencies. Use a wheel built from a specific Git
+commit. Check its import path in the outer log and verify that the inner
+workflow uses the expected code when qualifying a new wheel/image pair.
+
 ## Execution Architecture (Two-Layer Model)
 
 APEX uses a **two-layer submission architecture**:
